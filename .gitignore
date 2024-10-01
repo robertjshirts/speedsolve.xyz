@@ -1,3 +1,16 @@
 *.log
-.terraform/
 node_modules/
+.nuxt/
+
+
+.terraform/
+.terraform.lock.hcl         # Lock file for provider versions
+*.tfstate                  # State files storing resource info
+*.tfstate.backup           # Backup state files
+crash.log                  # Terraform crash logs
+*.tfvars                   # Files that contain sensitive data like credentials
+override.tf                # Override configuration files
+override.tf.json           # Override configuration files in JSON format
+*_override.tf              # Custom override files
+*_override.tf.json         # Custom override files in JSON format
+terraform.tfvars.json      # Optional variables file with sensitive dat
