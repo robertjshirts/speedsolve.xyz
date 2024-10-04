@@ -1,6 +1,7 @@
 *.log
 node_modules/
 .nuxt/
+client/.data/hub
 
 
 .terraform/
