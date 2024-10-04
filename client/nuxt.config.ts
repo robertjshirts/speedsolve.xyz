@@ -4,7 +4,5 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss', '@nuxthub/core'],
   hub: {
-    database: true,
-    blob: true
   }
 })
