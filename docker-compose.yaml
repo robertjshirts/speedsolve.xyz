@@ -11,6 +11,7 @@ services:
     volumes:
       - ./traefik/traefik.yaml:/etc/traefik/traefik.yaml
       - /var/run/docker.sock:/var/run/docker.sock:ro  # Provide Docker socke
+      - ./traefik/acme.json:/acme.json # Provide certificate file
     labels:
       - "traefik.enable=true"
   health:

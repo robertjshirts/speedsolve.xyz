@@ -12,7 +12,7 @@ type HealthResponse struct {
 
 // echoHandler handles the echo requests
 func healthHandler(w http.ResponseWriter, r *http.Request) {
-	response := HealthResponse{Status: "healthy"}
+	response := HealthResponse{Status: "healthy :)"}
 
 	// Set the content type to application/json
 	w.Header().Set("Content-Type", "application/json")
