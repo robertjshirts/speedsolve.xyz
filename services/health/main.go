@@ -24,8 +24,9 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	http.HandleFunc("/health", healthHandler)
 
-	fmt.Println("Server is listening on :8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	fmt.Println("Server is listening on :80")
+	fmt.Println("Good luck, stay even")
+	if err := http.ListenAndServe(":80", nil); err != nil {
 		fmt.Printf("Failed to start server: %v\n", err)
 	}
 }
