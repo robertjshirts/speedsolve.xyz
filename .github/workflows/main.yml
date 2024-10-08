@@ -10,7 +10,7 @@ jobs:
 
     steps:        
       - name: Debug SSH Key (For Debugging Only)
-        run: echo "$GCE_SSH_KEY" | sed 's/./*/g'
+        run: echo "$GCP_INSTANCE_USER"
       - name: Deploy to Compute Engine
         uses: appleboy/ssh-action@v0.1.3
         with:
