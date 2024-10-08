@@ -1,0 +1,26 @@
+name: Deploy to GCP Compute Engine
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+        
+      - name: Deploy to Compute Engine
+        uses: appleboy/ssh-action@v0.1.3
+        with:
+          host: ${{ secrets.GCP_INSTANCE_IP }}
+          username: ${{ secrets.GCP_INSTANCE_USER }}
+          key: ${{ secrets.GCP_INSTANCE_SSH_KEY }}
+          script: |
+            cd ~/speedsolve.xyz
+            git pull
+            docker-compose down --rmi "local"
+            docker-compose up
