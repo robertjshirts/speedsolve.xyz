@@ -9,8 +9,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:        
-      - name: Debug SSH Key (For Debugging Only)
-        run: echo "$GCP_INSTANCE_USER"
       - name: Deploy to Compute Engine
         uses: appleboy/ssh-action@v1.0.3
         with:
