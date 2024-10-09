@@ -19,4 +19,4 @@ jobs:
             cd ~/speedsolve.xyz
             git pull
             docker-compose down --rmi "local"
-            docker-compose up -d
+            docker-compose up -d --build
