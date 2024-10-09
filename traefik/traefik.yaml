@@ -3,10 +3,9 @@ entryPoints:
     address: ":80"
   websecure:
     address: ":443"
-
-# api:
-#   dashboard: true
-#   insecure: true
+    http:
+      tls:
+        certResolver: letsencrypt
 
 log:
   level: INFO
@@ -16,10 +15,9 @@ providers:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
 
-certificateResolvers:
+certificatesResolvers:
   letsencrypt:
     acme:
       email: robertjshirts@gmail.com
       storage: acme.json
       tlsChallenge: {}
-        
