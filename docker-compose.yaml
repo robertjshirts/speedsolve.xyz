@@ -14,13 +14,15 @@ services:
       - ./traefik/traefik.yaml:/etc/traefik/traefik.yaml
       - /var/run/docker.sock:/var/run/docker.sock:ro  # Provide Docker socke
       - ./traefik/acme.json:/acme.json # Provide certificate file
+    environment:
+      - CLOUDFLARE_DNS_API_TOKEN
     restart: unless-stopped
   health:
     build: ./services/health/
     container_name: health
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.health-router.rule=PathPrefix(`/health`)"
+      - "traefik.http.routers.health-router.rule=Host(`api.speedsolve.xyz`) && PathPrefix(`/health`)"
       - "traefik.http.routers.health-router.entrypoints=websecure"
       - "traefik.http.routers.health-router.tls=true"
       - "traefik.http.routers.health-router.tls.certresolver=letsencrypt"

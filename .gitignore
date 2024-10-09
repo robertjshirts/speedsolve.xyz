@@ -3,6 +3,7 @@ node_modules/
 .nuxt/
 client/.data/hub
 traefik/acme.json
+.env
 
 
 .terraform/
