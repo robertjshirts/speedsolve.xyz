@@ -20,4 +20,5 @@ certificatesResolvers:
     acme:
       email: robertjshirts@gmail.com
       storage: acme.json
-      tlsChallenge: {}
+      dnsChallenge:
+        provider: cloudflare
