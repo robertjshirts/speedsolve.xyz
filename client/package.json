@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@auth0/auth0-vue": "^2.3.3",
     "@nuxthub/core": "^0.7.23",
     "nuxt": "^3.13.0",
     "vue": "latest",
