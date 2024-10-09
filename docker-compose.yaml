@@ -2,26 +2,29 @@ services:
   traefik:
     image: traefik:v2.10
     container_name: traefik
-    restart: always
     command:
       - --configFile=/etc/traefik/traefik.yaml
+    labels:
+      - "traefik.enable=true"
     ports:
-      - "80:80"     # HTTP
+      - "80:80" # HTTP
+      - "443:443" # HTTPS
       - "8080:8080" # Dashboard
     volumes:
       - ./traefik/traefik.yaml:/etc/traefik/traefik.yaml
       - /var/run/docker.sock:/var/run/docker.sock:ro  # Provide Docker socke
       - ./traefik/acme.json:/acme.json # Provide certificate file
-    labels:
-      - "traefik.enable=true"
+    restart: unless-stopped
   health:
     build: ./services/health/
     container_name: health
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.health_router.rule=PathPrefix(`/health`)"
-      - "traefik.http.routers.health_router.entrypoints=web"
-      - "traefik.http.services.health.loadbalancer.server.port=80"
+      - "traefik.http.routers.health-router.rule=PathPrefix(`/health`)"
+      - "traefik.http.routers.health-router.entrypoints=websecure"
+      - "traefik.http.routers.health-router.tls=true"
+      - "traefik.http.routers.health-router.tls.certresolver=letsencrypt"
+      - "traefik.http.services.health-service.loadbalancer.server.port=80"
 
 
 networks:
