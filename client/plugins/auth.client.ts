@@ -6,7 +6,7 @@ export default defineNuxtPlugin(nuxtApp => {
     domain: authConfig.domain,
     clientId: authConfig.clientId,
     authorizationParams: {
-      redirect_uri: 'http://localhost:3000',
+      redirect_uri: authConfig.redirectUri,
     },
   });
   nuxtApp.vueApp.use(auth0);
