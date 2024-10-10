@@ -4,6 +4,7 @@ node_modules/
 client/.data/hub
 traefik/acme.json
 .env
+auth_config.json
 
 
 .terraform/
