@@ -4,4 +4,11 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@nuxtjs/tailwindcss', '@nuxthub/core'],
   ssr: false,
+  runtimeConfig: {
+    public: {
+      domain: '',
+      clientId: '',
+      redirectUri: ''
+    }
+  }
 })
