@@ -11,7 +11,7 @@ services:
     volumes:
       - ./traefik/traefik.yaml:/etc/traefik/traefik.yaml
       - /var/run/docker.sock:/var/run/docker.sock:ro  # Provide Docker socke
-      - ./traefik/acme.json:/acme.json # Provide certificate file
+      - ./traefik/acme.json:/etc/traefik/acme.json # Provide certificate file
     environment:
       - CLOUDFLARE_DNS_API_TOKEN
     restart: unless-stopped
