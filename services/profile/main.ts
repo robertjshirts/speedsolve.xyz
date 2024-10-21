@@ -1,4 +1,4 @@
-import "@std/dotenv/load";
+import "dotenv";
 import { Application } from "oak";
 
 import router from "./routes.ts";

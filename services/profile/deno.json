@@ -3,7 +3,7 @@
     "dev": "deno run --allow-net --allow-read --allow-env --watch main.ts"
   },
   "imports": {
-    "@std/dotenv": "jsr:@std/dotenv@^0.225.2",
+    "dotenv": "jsr:@std/dotenv@^0.225.2/load",
     "oak": "jsr:@oak/oak@^17.1.0",
     "pg": "npm:pg@^8.13.0",
     "pg-hstore": "npm:pg-hstore@^2.3.4",

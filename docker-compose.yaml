@@ -15,6 +15,16 @@ services:
     environment:
       - CLOUDFLARE_DNS_API_TOKEN
     restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard-router.rule=Host(`api.speedsolve.xyz`) && (PathPrefix(`/dashboard`) || PathPrefix(`/api`))"
+      - "traefik.http.routers.dashboard-router.service=api@internal"
+      - "traefik.http.routers.dashboard-router.entrypoints=websecure"
+      - "traefik.http.routers.dashboard-router.tls=true"
+      - "traefik.http.routers.dashboard-router.tls.certresolver=letsencrypt"
+      - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_BASIC_AUTH}"
+      - "traefik.http.routers.dashboard-router.middlewares=auth"
+
   health:
     build: ./services/health/
     container_name: health
@@ -25,6 +35,9 @@ services:
       - "traefik.http.routers.health-router.tls=true"
       - "traefik.http.routers.health-router.tls.certresolver=letsencrypt"
       - "traefik.http.services.health-service.loadbalancer.server.port=80"
+      - "traefik.http.services.health-service.loadbalancer.healthcheck.path=/health"
+      - "traefik.http.services.health-service.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.health-service.loadbalancer.healthcheck.timeout=3s"
   profile:
     build: ./services/profile/
     container_name: profile
@@ -35,6 +48,9 @@ services:
       - "traefik.http.routers.profile-router.tls=true"
       - "traefik.http.routers.profile-router.tls.certresolver=letsencrypt"
       - "traefik.http.services.profile-service.loadbalancer.server.port=8000"
+      - "traefik.http.services.profile-service.loadbalancer.healthcheck.path=/profile/health"
+      - "traefik.http.services.profile-service.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.profile-service.loadbalancer.healthcheck.timeout=3s"
 
 
 
