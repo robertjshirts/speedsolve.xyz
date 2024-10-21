@@ -3,9 +3,9 @@ import { useAuth0 } from '@auth0/auth0-vue'
 export default {
   setup() {
     const { isLoading, isAuthenticated, loginWithRedirect, logout, idTokenClaims } = useAuth0();
-    let username;
+    const username = ref(idTokenClaims ? idTokenClaims.value?.username : '');
     if (idTokenClaims && idTokenClaims.value) {
-      username = idTokenClaims.value.username;
+      username.value = idTokenClaims.value.username;
     }
 
 
