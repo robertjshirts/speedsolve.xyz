@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { isAuthenticated, useAuth0 } from "@auth0/auth0-vue";
-const auth0 = useAuth0();
 
 </script>
 
