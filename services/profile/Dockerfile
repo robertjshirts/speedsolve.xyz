@@ -4,8 +4,8 @@ EXPOSE 8000
 
 WORKDIR /app
 
-COPY . .
+COPY . /app
 
-RUN deno install
+RUN deno install -e main.ts
 
-CMD ["deno", "run", "--allow-read", "--allow-net", "--allow-env", "main.ts"]
+CMD ["run", "--allow-read", "--allow-net", "--allow-env", "main.ts"]

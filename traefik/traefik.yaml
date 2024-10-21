@@ -6,6 +6,9 @@ entryPoints:
     http:
       tls:
         certResolver: letsencrypt
+api:
+  dashboard: true
+  insecure: false 
 
 log:
   level: INFO

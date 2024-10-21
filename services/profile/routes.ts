@@ -4,8 +4,8 @@ import * as h from "./handlers.ts";
 import { authMiddleware } from "./auth.ts";
 
 const router = new Router();
-router.get("/", (ctx) => {
-	ctx.response.body = "Hello, world! :)";
+router.get("/profile/health", (ctx) => {
+	ctx.response.status = 200;
 });
 
 router.post(
