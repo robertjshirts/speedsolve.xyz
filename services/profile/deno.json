@@ -1,0 +1,15 @@
+{
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read --allow-env --watch main.ts"
+  },
+  "imports": {
+    "@std/dotenv": "jsr:@std/dotenv@^0.225.2",
+    "oak": "jsr:@oak/oak@^17.1.0",
+    "pg": "npm:pg@^8.13.0",
+    "pg-hstore": "npm:pg-hstore@^2.3.4",
+    "sequelize": "npm:sequelize@^6.37.4",
+    "status": "jsr:@oak/commons@1.0.0/status",
+    "zod": "https://deno.land/x/zod@v3.23.8/mod.ts",
+    "jose": "https://deno.land/x/jose@v5.9.4/index.ts"
+  }
+}

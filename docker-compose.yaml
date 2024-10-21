@@ -25,6 +25,17 @@ services:
       - "traefik.http.routers.health-router.tls=true"
       - "traefik.http.routers.health-router.tls.certresolver=letsencrypt"
       - "traefik.http.services.health-service.loadbalancer.server.port=80"
+  profile:
+    build: ./services/profile/
+    container_name: profile
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.profile-router.rule=Host(`api.speedsolve.xyz`) && PathPrefix(`/profile`)"
+      - "traefik.http.routers.profile-router.entrypoints=websecure"
+      - "traefik.http.routers.profile-router.tls=true"
+      - "traefik.http.routers.profile-router.tls.certresolver=letsencrypt"
+      - "traefik.http.services.profile-service.loadbalancer.server.port=8000"
+
 
 
 networks:

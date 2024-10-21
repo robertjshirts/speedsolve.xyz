@@ -9,6 +9,6 @@ COPY *.go ./
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /health-server
 
-EXPOSE 8080
+EXPOSE 80
 
 CMD ["/health-server"]
