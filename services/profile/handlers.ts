@@ -1,9 +1,9 @@
-import { Context } from "oak";
+import { RouterContext } from "oak";
 import { ProfilePostBody } from "./validation.ts";
 import * as db from "./models.ts";
 import { STATUS_CODE } from "status";
 
-export const ProfilePostHandler = async (ctx: Context) => {
+export const ProfilePostHandler = async (ctx: RouterContext<"/profile">) => {
 	const body: ProfilePostBody = ctx.state.validatedBody;
 	const { usernameTaken, emailTaken } = await db.isUsernameOrEmailTaken(
 		body.username,
@@ -12,7 +12,9 @@ export const ProfilePostHandler = async (ctx: Context) => {
 
 	if (usernameTaken || emailTaken) {
 		let message = "";
-		if (usernameTaken) message += `Username ${body.username} is in use. `;
+		if (usernameTaken) {
+			message += `Username ${body.username} is in use. `;
+		}
 		if (emailTaken) message += `Email ${body.email} is in use.`;
 		ctx.response.body = message;
 		ctx.response.status = STATUS_CODE.BadRequest;
@@ -33,7 +35,9 @@ export const ProfilePostHandler = async (ctx: Context) => {
 	}
 };
 
-export const ProfileGetHandler = async (ctx: Context) => {
+export const ProfileGetHandler = async (
+	ctx: RouterContext<"/profile/:username">,
+) => {
 	if (!ctx.params) {
 		ctx.response.status = STATUS_CODE.BadRequest;
 		ctx.response.body = { "error": "Username in path is required" };
@@ -64,7 +68,9 @@ export const ProfileGetHandler = async (ctx: Context) => {
 	}
 };
 
-export const ProfilePutHandler = async (ctx: Context) => {
+export const ProfilePutHandler = async (
+	ctx: RouterContext<"/profile/:username">,
+) => {
 	if (!ctx.params) {
 		ctx.response.status = STATUS_CODE.BadRequest;
 		ctx.response.body = { "error": "Username in path is required" };
@@ -105,7 +111,9 @@ export const ProfilePutHandler = async (ctx: Context) => {
 	}
 };
 
-export const ProfileDeleteHandler = async (ctx: Context) => {
+export const ProfileDeleteHandler = async (
+	ctx: RouterContext<"/profile/:username">,
+) => {
 	if (!ctx.params) {
 		ctx.response.status = STATUS_CODE.BadRequest;
 		ctx.response.body = { "error": "Username in path is required" };

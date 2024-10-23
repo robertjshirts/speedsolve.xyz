@@ -1,10 +1,7 @@
-import { Next, RouterContext } from "oak";
+import { Context, helpers, Next } from "oak";
 import * as jose from "jose";
 import { STATUS_CODE } from "status";
-export async function authMiddleware(
-	ctx: RouterContext<"/profile/:id">,
-	next: Next,
-) {
+export async function authMiddleware(ctx: Context, next: Next) {
 	const authHeader = ctx.request.headers.get("Authorization");
 
 	if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -42,14 +39,15 @@ export async function authMiddleware(
 			return;
 		}
 
+		const params = helpers.getQuery(ctx, { mergeParams: true });
 		// If token username and path don't match, block request
 		if (
-			ctx.params?.username !==
+			params.username !==
 				payload["https://speedsolve.xyz/username"]
 		) {
 			ctx.response.status = STATUS_CODE.Forbidden;
 			ctx.response.body = {
-				error: `You do not have permission to edit or delete ${ctx.params?.username}'s profile!`,
+				error: `You do not have permission to edit or delete ${params.username}'s profile!`,
 			};
 			return;
 		}

@@ -8,7 +8,6 @@ export default {
       username.value = idTokenClaims.value.username;
     }
 
-
     return {
       loading: isLoading,
       authenticated: isAuthenticated,
@@ -17,7 +16,11 @@ export default {
         loginWithRedirect();
       },
       logout: async () => {
-        logout();
+        logout({
+          logoutParams: {
+            returnTo: window.location.href,
+          }
+        });
       }
     }
   }
