@@ -4,9 +4,9 @@ export default {
   setup() {
     const { isLoading, isAuthenticated, loginWithRedirect, logout, idTokenClaims } = useAuth0();
     const username = ref(idTokenClaims ? idTokenClaims.value?.username : '');
-    if (idTokenClaims && idTokenClaims.value) {
-      username.value = idTokenClaims.value.username;
-    }
+    watch(idTokenClaims, (newClaims) => {
+      username.value = newClaims?.username;
+    })
 
     return {
       loading: isLoading,

@@ -2,7 +2,7 @@
 const config = useRuntimeConfig();
 const route = useRoute();
 
-const response = await fetch(`${config.public.apiUrl}health`);
+const response = await fetch(`${config.public.apiUrl}profile/${route.params.username}`);
 if (!response.ok) {
   throw createError({
     statusCode: response.status,
@@ -11,6 +11,7 @@ if (!response.ok) {
 }
 
 const body = await response.json();
+
 </script>
 
 <template>

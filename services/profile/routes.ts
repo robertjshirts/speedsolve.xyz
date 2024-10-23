@@ -19,7 +19,7 @@ router.get(
 	h.ProfileGetHandler,
 );
 
-router.put(
+router.patch(
 	"/profile/:username",
 	v.validateBody(v.ProfileUpdateBody),
 	authMiddleware,
