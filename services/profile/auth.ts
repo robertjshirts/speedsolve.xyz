@@ -2,7 +2,7 @@ import { Next, RouterContext } from "oak";
 import * as jose from "jose";
 import { STATUS_CODE } from "status";
 export async function authMiddleware(
-	ctx: RouterContext<"/profile/:id">,
+	ctx: RouterContext<"/profile/:username">,
 	next: Next,
 ) {
 	const authHeader = ctx.request.headers.get("Authorization");

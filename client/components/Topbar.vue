@@ -1,31 +1,7 @@
-<script lang="ts">
-import { useAuth0 } from '@auth0/auth0-vue'
-export default {
-  setup() {
-    const { isLoading, isAuthenticated, loginWithRedirect, logout, idTokenClaims } = useAuth0();
-    const username = ref(idTokenClaims ? idTokenClaims.value?.username : '');
-    if (idTokenClaims && idTokenClaims.value) {
-      username.value = idTokenClaims.value.username;
-    }
+<script setup lang="ts">
+import { useAuth } from '~/composables/useAuth';
 
-    return {
-      loading: isLoading,
-      authenticated: isAuthenticated,
-      username: username,
-      login: async () => {
-        loginWithRedirect();
-      },
-      logout: async () => {
-        logout({
-          logoutParams: {
-            returnTo: window.location.href,
-          }
-        });
-      }
-    }
-  }
-}
-
+const { loading, authenticated, username, login, logout } = useAuth();
 </script>
 
 <template>
