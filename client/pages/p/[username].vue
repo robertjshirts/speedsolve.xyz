@@ -1,21 +1,21 @@
 <script setup lang="ts">
-const config = useRuntimeConfig();
+
 const route = useRoute();
+const { profile, loading, error, getProfile } = useProfile();
 
-const response = await fetch(`${config.public.apiUrl}profile/${route.params.username}`);
-if (!response.ok) {
-  throw createError({
-    statusCode: response.status,
-    statusMessage: await response.json()
-  });
-}
-
-const body = await response.json();
+await getProfile(route.params.username as string);
 
 </script>
 
 <template>
   <div>
-    <p>{{ body }}</p>
+    <div v-if="loading">Loading...</div>
+    <div v-else-if="error">Error: {{ error.message }}</div>
+    <div v-else-if="profile">
+      <p>Username: {{ profile.username }}</p>
+      <p>Email: {{ profile.email }}</p>
+      <img :src="profile.pfp" :alt="profile.username" />
+      <p>Member since: {{ new Date(profile.createdAt).toLocaleDateString() }}</p>
+    </div>
   </div>
 </template>
