@@ -51,8 +51,19 @@ services:
       - "traefik.http.services.profile-service.loadbalancer.healthcheck.path=/profile/health"
       - "traefik.http.services.profile-service.loadbalancer.healthcheck.interval=10s"
       - "traefik.http.services.profile-service.loadbalancer.healthcheck.timeout=3s"
-
-
+  competition:
+    build: ./services/competition/
+    container_name: competition
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.competition-router.rule=Host(`api.speedsolve.xyz`) && PathPrefix(`/comp`)"
+      - "traefik.http.routers.competition-router.entrypoints=websecure"
+      - "traefik.http.routers.competition-router.tls=true"
+      - "traefik.http.routers.competition-router.tls.certresolver=letsencrypt"
+      - "traefik.http.services.competition-service.loadbalancer.server.port=8000"
+      - "traefik.http.services.competition-service.loadbalancer.healthcheck.path=/comp/health"
+      - "traefik.http.services.competition-service.loadbalancer.healthcheck.interval=10s"
+      - "traefik.http.services.competition-service.loadbalancer.healthcheck.timeout=3s"
 
 networks:
   default:
