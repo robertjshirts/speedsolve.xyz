@@ -12,7 +12,6 @@ export const useProfile = () => {
     const token = await getAccessTokenSilently();
     return {
       'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json'
     }
   }
 
@@ -25,6 +24,8 @@ export const useProfile = () => {
       const response = await fetch(`${config.public.apiUrl}profile/${username}`, {
         headers
       })
+
+      console.log(response);
 
       if (!response.ok) {
         throw createError({
