@@ -1,11 +1,15 @@
 import { STATUS_CODE } from "status";
 import { Router, type RouterContext } from "oak";
 import { generateScramble } from "./scrambler.ts";
-import { error } from "console";
 
 const router = new Router();
 
 const competitions = new Map<string, Competition>();
+
+router.get("/comp/health", (ctx: RouterContext<"/comp/health">) => {
+	ctx.response.status = STATUS_CODE.OK;
+	return;
+});
 
 // TODO: add a proper queueing system
 router.post("/comp", async (ctx: RouterContext<"/comp">) => {
@@ -68,7 +72,7 @@ router.post(
 			return;
 		}
 
-		if (competition.participants.includes(body.userId)) {
+		if (!competition.participants.includes(body.userId)) {
 			ctx.response.status = STATUS_CODE.Forbidden;
 			ctx.response.body = { error: "User not in competition" };
 			return;
