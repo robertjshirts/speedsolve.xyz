@@ -24,20 +24,6 @@ services:
       - "traefik.http.routers.dashboard-router.tls.certresolver=letsencrypt"
       - "traefik.http.middlewares.auth.basicauth.users=${TRAEFIK_BASIC_AUTH}"
       - "traefik.http.routers.dashboard-router.middlewares=auth"
-
-  health:
-    build: ./services/health/
-    container_name: health
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.health-router.rule=Host(`api.speedsolve.xyz`) && PathPrefix(`/health`)"
-      - "traefik.http.routers.health-router.entrypoints=websecure"
-      - "traefik.http.routers.health-router.tls=true"
-      - "traefik.http.routers.health-router.tls.certresolver=letsencrypt"
-      - "traefik.http.services.health-service.loadbalancer.server.port=80"
-      - "traefik.http.services.health-service.loadbalancer.healthcheck.path=/health"
-      - "traefik.http.services.health-service.loadbalancer.healthcheck.interval=10s"
-      - "traefik.http.services.health-service.loadbalancer.healthcheck.timeout=3s"
   profile:
     build: ./services/profile/
     container_name: profile
