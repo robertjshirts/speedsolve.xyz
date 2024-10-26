@@ -31,6 +31,10 @@ export const ProfileDB = sequelize.define(
 				isEmail: true,
 			},
 		},
+		bio: {
+			type: DataTypes.TEXT,
+			allowNull: true,
+		},
 		pfp: {
 			type: DataTypes.STRING,
 			allowNull: true,
@@ -58,9 +62,8 @@ export async function isUsernameOrEmailTaken(username: string, email: string) {
 
 		if (existingUser) {
 			return {
-				usernameTaken:
-					existingUser.get("username") ===
-						username,
+				usernameTaken: existingUser.get("username") ===
+					username,
 				emailTaken: existingUser.get("email") === email,
 			};
 		}
@@ -82,4 +85,4 @@ try {
 
 // TODO: REMOVE
 // sync DB and drop Profiles table
-await sequelize.sync();
+await sequelize.sync({ force: true });

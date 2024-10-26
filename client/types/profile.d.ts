@@ -6,6 +6,7 @@ declare global {
     username: string
     email: string
     pfp: string
+    bio: string
     createdAt: string
     updatedAt: string
   }

@@ -2,30 +2,25 @@ import { useAuth0 } from "@auth0/auth0-vue";
 
 export const useAuthenticatedFetch = () => {
   const { isAuthenticated, getAccessTokenSilently } = useAuth0();
-  if (!isAuthenticated) {
-    return;
-  }
 
   const authenticatedFetch = async (url: string, options: RequestInit = {}) => {
-    try {
-      const token = await getAccessTokenSilently();
-      console.log(token);
-      const response = await fetch(url, {
-        ...options,
-        headers: {
-          ...options.headers,
+    // Clone options to avoid mutating original reference
+    const requestOptions = { ...options, headers: { ...options.headers } };
+
+    if (isAuthenticated.value) {
+      try {
+        const token = await getAccessTokenSilently();
+        requestOptions.headers = {
+          ...requestOptions.headers,
           Authorization: `Bearer ${token}`,
-        },
-      });
-      return response;
-    } catch (error) {
-      if (error instanceof Error) {
-        console.log(error.name);
-        console.log(error.message);
-        console.log(error.stack);
+        };
+      } catch (error) {
+        console.error("Failed to get access token:", error);
+        throw error;
       }
-      throw error;
     }
+
+    return fetch(url, requestOptions);
   };
 
   return { authenticatedFetch };
