@@ -1,105 +1,90 @@
-import { ref } from 'vue'
-import { useAuth0 } from '@auth0/auth0-vue'
+import { ref } from 'vue';
+import { useAuthenticatedFetch } from './useAuthenticatedFetch';
 
 export const useProfile = () => {
   const config = useRuntimeConfig();
-  const { getAccessTokenSilently } = useAuth0();
+  const { authenticatedFetch } = useAuthenticatedFetch();
   const loading = ref(false);
   const error = ref<Error | null>(null);
   const profile = ref<Profile | null>(null);
 
-  const getAuthHeader = async () => {
-    const token = await getAccessTokenSilently();
-    return {
-      'Authorization': `Bearer ${token}`,
-    }
-  }
-
   const getProfile = async (username: string) => {
-    loading.value = true
-    error.value = null
+    loading.value = true;
+    error.value = null;
 
     try {
-      const headers = await getAuthHeader()
-      const response = await fetch(`${config.public.apiUrl}profile/${username}`, {
-        headers
-      })
-
-      console.log(response);
+      const response = await authenticatedFetch(`${config.public.apiUrl}profile/${username}`);
 
       if (!response.ok) {
         throw createError({
           statusCode: response.status,
-          statusMessage: await response.text()
-        })
+          statusMessage: await response.text(),
+        });
       }
-      profile.value = await response.json()
+      profile.value = await response.json();
     } catch (e) {
-      error.value = e as Error
-      throw e
+      error.value = e as Error;
+      throw e;
     } finally {
-      loading.value = false
+      loading.value = false;
     }
 
-    return profile.value
-  }
+    return profile.value;
+  };
 
   const updateProfile = async (username: string, updates: Partial<Profile>) => {
-    loading.value = true
-    error.value = null
+    loading.value = true;
+    error.value = null;
 
     try {
-      const headers = await getAuthHeader()
-      const response = await fetch(`${config.public.apiUrl}profile/${username}`, {
+      const response = await authenticatedFetch(`${config.public.apiUrl}profile/${username}`, {
         method: 'PATCH',
-        headers,
-        body: JSON.stringify(updates)
-      })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
 
       if (!response.ok) {
         throw createError({
           statusCode: response.status,
-          statusMessage: await response.text()
-        })
+          statusMessage: await response.text(),
+        });
       }
 
-      profile.value = await response.json()
+      profile.value = await response.json();
     } catch (e) {
-      error.value = e as Error
-      throw e
+      error.value = e as Error;
+      throw e;
     } finally {
-      loading.value = false
+      loading.value = false;
     }
 
-    return profile.value
-  }
+    return profile.value;
+  };
 
   const deleteProfile = async (username: string) => {
-    loading.value = true
-    error.value = null
+    loading.value = true;
+    error.value = null;
 
     try {
-      const headers = await getAuthHeader()
-      const response = await fetch(`${config.public.apiUrl}profile/${username}`, {
+      const response = await authenticatedFetch(`${config.public.apiUrl}profile/${username}`, {
         method: 'DELETE',
-        headers
-      })
+      });
 
       if (!response.ok) {
         throw createError({
           statusCode: response.status,
-          statusMessage: await response.text()
-        })
+          statusMessage: await response.text(),
+        });
       }
 
-      profile.value = null
+      profile.value = null;
     } catch (e) {
-      error.value = e as Error
-      throw e
+      error.value = e as Error;
+      throw e;
     } finally {
-      loading.value = false
+      loading.value = false;
     }
-  }
+  };
 
   return {
     profile,
@@ -107,6 +92,6 @@ export const useProfile = () => {
     error,
     getProfile,
     updateProfile,
-    deleteProfile
-  }
-}
+    deleteProfile,
+  };
+};

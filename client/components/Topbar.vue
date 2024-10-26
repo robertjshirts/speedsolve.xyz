@@ -7,22 +7,22 @@ const { loading, authenticated, username, login, logout } = useAuth();
 <template>
   <div class="fixed top-0 z-50 w-full border-b bg-white bg-opacity-80 backdrop-blur">
     <div class="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3">
-      <span class="text-xl font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer">
+      <NuxtLink to="/" class="text-xl font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer">
         Speedsolve.xyz
-      </span>
+      </NuxtLink>
       <div class="flex space-x-12">
-        <a href="#" class="text-gray-600 hover:text-indigo-600 transition duration-150 ease-in-out">
+        <NuxtLink to="/" class="text-gray-600 hover:text-indigo-600 transition duration-150 ease-in-out">
           Solo
-        </a>
-        <a href="#" class="text-gray-600 hover:text-indigo-600 transition duration-150 ease-in-out">
+        </NuxtLink>
+        <NuxtLink to="/" class="text-gray-600 hover:text-indigo-600 transition duration-150 ease-in-out">
           Multiplayer
-        </a>
+        </NuxtLink>
       </div>
       <span v-if="loading" class="text-gray-500 animate-pulse">
         Loading...
       </span>
       <div v-else-if="authenticated" class="flex items-center space-x-4">
-        <span class="text-gray-700">{{ username }}</span>
+        <NuxtLink :to="`/p/${username}`" class="font-bold text-gray-700 hover:text-indigo-600">{{ username }}</NuxtLink>
         <button @click="logout"
           class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition duration-150 ease-in-out">
           Logout

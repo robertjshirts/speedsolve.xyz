@@ -9,13 +9,11 @@ await getProfile(route.params.username as string);
 
 <template>
   <div>
-    <div v-if="loading">Loading...</div>
+    <div v-if="loading">Loading..</div>
     <div v-else-if="error">Error: {{ error.message }}</div>
-    <div v-else-if="profile">
-      <p>Username: {{ profile.username }}</p>
-      <p>Email: {{ profile.email }}</p>
-      <img :src="profile.pfp" :alt="profile.username" />
-      <p>Member since: {{ new Date(profile.createdAt).toLocaleDateString() }}</p>
-    </div>
+    <img :src="profile?.pfp" :alt="profile?.username" class="max-w-20" />
+    <p>Username: {{ profile?.username }}</p>
+    <p>Email: {{ profile?.email }}</p>
+    <p>Member since: {{ new Date(profile?.createdAt || '').toLocaleDateString() }}</p>
   </div>
 </template>
