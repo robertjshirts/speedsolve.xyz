@@ -23,8 +23,12 @@ export const useProfile = () => {
       }
       profile.value = await response.json();
     } catch (e) {
-      error.value = e as Error;
-      throw e;
+      throw createError({
+        fatal: true,
+        statusCode: 404,
+        statusMessage: "Page not found",
+        data: e
+      })
     } finally {
       loading.value = false;
     }
