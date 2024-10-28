@@ -7,9 +7,15 @@ export const useAuthenticatedFetch = () => {
     // Clone options to avoid mutating original reference
     const requestOptions = { ...options, headers: { ...options.headers } };
 
+    // TODO: remove this in prod
+    console.log("is authenticated?")
+    console.log(isAuthenticated.value)
+
     if (isAuthenticated.value) {
       try {
         const token = await getAccessTokenSilently();
+        console.log("access token")
+        console.log(token)
         requestOptions.headers = {
           ...requestOptions.headers,
           Authorization: `Bearer ${token}`,
