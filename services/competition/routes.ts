@@ -1,154 +1,83 @@
 import { STATUS_CODE } from "status";
 import { Router, type RouterContext } from "oak";
 import { generateScramble } from "./scrambler.ts";
+import { CompetitionStateManager } from "./competition_manager.ts";
 
 const router = new Router();
+const stateManager = new CompetitionStateManager();
 
-const competitions = new Map<string, Competition>();
-
-router.get("/comp/health", (ctx: RouterContext<"/comp/health">) => {
-	ctx.response.status = STATUS_CODE.OK;
-	return;
-});
-
-// TODO: add a proper queueing system
-router.post("/comp", async (ctx: RouterContext<"/comp">) => {
-	const body = await ctx.request.body.json();
-
-	if (!body.participants || body.participants.length !== 2) {
-		ctx.response.status = STATUS_CODE.BadRequest;
-		ctx.response.body = { error: "Exactly 2 participants required" };
+router.get(
+	"/competition/health",
+	(ctx: RouterContext<"/competition/health">) => {
+		ctx.response.status = STATUS_CODE.OK;
 		return;
+	},
+);
+
+router.get("/competition/ws", async (ctx: RouterContext<"/competition/ws">) => {
+	if (!ctx.isUpgradable) {
+		ctx.throw(
+			STATUS_CODE.BadRequest,
+			"Connection must upgrade to websocket!",
+		);
 	}
 
-	const competition: Competition = {
-		id: crypto.randomUUID(),
-		participants: body.participants,
-		readyParticipants: new Set(),
-		scramble: generateScramble(),
-		state: "scrambling",
-		results: [],
-		createdAt: new Date(),
+	const ws = ctx.upgrade();
+	const username = ctx.state.username;
+	stateManager.addConnection(username, ws);
+
+	console.log(`websocket connection established for ${username}`);
+
+	ws.onclose = (event) => {
+		console.log(
+			`websocket connection closed for ${username}. reason: ${event.reason}`,
+		);
+		stateManager.handleDisconnect(username);
 	};
 
-	competitions.set(competition.id, competition);
+	ws.onmessage = (event) => {
+		try {
+			const message: WebSocketMessage = JSON.parse(event.data);
 
-	ctx.response.body = competition;
+			// Log incoming messages for debugging
+			console.log(`Received message from ${username}:`, message.type);
+
+			switch (message.type) {
+				case "SOLO_START":
+					stateManager.handleSoloStart(
+						username,
+						message.payload.cubeType,
+					);
+					break;
+				case "READY":
+					stateManager.handleReady(username);
+					break;
+				case "SOLVE_COMPLETE":
+					stateManager.handleSolveComplete(username, message.payload);
+					break;
+				//case "MULTI_QUEUE":
+				//  stateManager.handleMultiQueue(username, message.payload.cubeType);
+				//  break;
+				//case "LEAVE":
+				//  stateManager.handleLeave(username);
+				//  break;
+				//case "REMATCH":
+				//  stateManager.handleRematch(username);
+				//  break;
+				default:
+					console.warn(
+						`Unknown message type from ${username}:`,
+						message.type,
+					);
+			}
+		} catch (err) {
+			console.error(`Error processing message from ${username}:`, err);
+			ws.send(JSON.stringify({
+				type: "ERROR",
+				payload: { message: "Invalid message format" },
+			}));
+		}
+	};
 });
-
-router.get("/comp/:id", (ctx: RouterContext<"/comp/:id">) => {
-	const competition = competitions.get(ctx.params.id);
-
-	if (!competition) {
-		ctx.response.status = STATUS_CODE.NotFound;
-		ctx.response.body = { error: "competition not found" };
-		return;
-	}
-
-	ctx.response.body = competition;
-});
-
-router.post(
-	"/comp/:id/ready",
-	async (ctx: RouterContext<"/comp/:id/ready">) => {
-		const competition = competitions.get(ctx.params.id);
-		const body = await ctx.request.body.json();
-
-		if (!competition) {
-			ctx.response.status = STATUS_CODE.NotFound;
-			ctx.response.body = { error: "competition not found" };
-			return;
-		}
-
-		if (!body.userId) {
-			ctx.response.status = STATUS_CODE.BadRequest;
-			ctx.response.body = { error: "userId required" };
-			return;
-		}
-
-		if (competition.state !== "scrambling") {
-			ctx.response.status = STATUS_CODE.BadRequest;
-			ctx.response.body = { error: "competition not in scramble state!" };
-			return;
-		}
-
-		if (!competition.participants.includes(body.userId)) {
-			ctx.response.status = STATUS_CODE.Forbidden;
-			ctx.response.body = { error: "User not in competition" };
-			return;
-		}
-
-		// mark user as ready
-		competition.readyParticipants.add(body.userId);
-
-		if (
-			competition.readyParticipants.size ===
-				competition.participants.length
-		) {
-			competition.state = "solving";
-		} else {
-			competition.state = "scrambling";
-		}
-
-		ctx.response.status = STATUS_CODE.OK;
-		ctx.response.body = {
-			...competition,
-			readyParticipants: Array.from(competition.readyParticipants),
-		};
-	},
-);
-
-router.post(
-	"/comp/:id/results",
-	async (ctx: RouterContext<"/comp/:id/results">) => {
-		const competition = competitions.get(ctx.params.id);
-		const body = await ctx.request.body.json();
-
-		if (!competition) {
-			ctx.response.status = 404;
-			ctx.response.body = { error: "Competition not found" };
-			return;
-		}
-
-		if (!body.userId || !body.time) {
-			ctx.response.status = 400;
-			ctx.response.body = { error: "userId and time required" };
-			return;
-		}
-
-		if (competition.state !== "solving") {
-			ctx.response.status = STATUS_CODE.BadRequest;
-			ctx.response.body = {
-				error: "Competition must be in solving state!",
-			};
-			return;
-		}
-
-		if (!competition.participants.includes(body.userId)) {
-			ctx.response.status = 403;
-			ctx.response.body = { error: "User not in competition" };
-			return;
-		}
-
-		if (
-			competition.results.some((result) => result.userId === body.userId)
-		) {
-			ctx.response.status = STATUS_CODE.BadRequest;
-			ctx.response.body = { error: "User already submitted time!" };
-			return;
-		}
-
-		competition.results.push({
-			userId: body.userId,
-			time: body.time,
-		});
-
-		if (competition.results.length === 2) {
-			competition.state = "complete";
-		}
-
-		ctx.response.body = competition;
-	},
-);
 
 export default router;
