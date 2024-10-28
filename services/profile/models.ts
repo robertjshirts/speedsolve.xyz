@@ -85,4 +85,4 @@ try {
 
 // TODO: REMOVE
 // sync DB and drop Profiles table
-await sequelize.sync({ force: true });
+await sequelize.sync();
