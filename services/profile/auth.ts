@@ -37,7 +37,8 @@ export async function authMiddleware(
 		if (!payload["https://speedsolve.xyz/username"]) {
 			ctx.response.status = STATUS_CODE.Unauthorized;
 			ctx.response.body = {
-				error: "Invalid token! Expected 'https://speedsolve.xyz/username' claim!",
+				error:
+					"Invalid token! Expected 'https://speedsolve.xyz/username' claim!",
 			};
 			return;
 		}
@@ -49,7 +50,8 @@ export async function authMiddleware(
 		) {
 			ctx.response.status = STATUS_CODE.Forbidden;
 			ctx.response.body = {
-				error: `You do not have permission to edit or delete ${ctx.params?.username}'s profile!`,
+				error:
+					`You do not have permission to edit or delete ${ctx.params?.username}'s profile!`,
 			};
 			return;
 		}
@@ -57,6 +59,7 @@ export async function authMiddleware(
 		await next();
 	} catch (error) {
 		console.error("Token verification failed:", error);
+		console.error("Token: ", token);
 		ctx.response.status = STATUS_CODE.Unauthorized;
 		ctx.response.body = { error: "Invalid token" };
 	}
