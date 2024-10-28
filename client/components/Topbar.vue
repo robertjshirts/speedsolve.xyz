@@ -11,7 +11,7 @@ const { loading, authenticated, username, login, logout } = useAuth();
         Speedsolve.xyz
       </NuxtLink>
       <div class="flex space-x-12">
-        <NuxtLink to="/" class="text-gray-600 hover:text-indigo-600 transition duration-150 ease-in-out">
+        <NuxtLink to="/solo" class="text-gray-600 hover:text-indigo-600 transition duration-150 ease-in-out">
           Solo
         </NuxtLink>
         <NuxtLink to="/" class="text-gray-600 hover:text-indigo-600 transition duration-150 ease-in-out">

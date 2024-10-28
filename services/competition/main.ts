@@ -1,7 +1,7 @@
 import "dotenv";
 import { Application } from "oak";
 
-import router from "./routes.ts";
+import router from "./websocket.ts";
 
 const app = new Application();
 
