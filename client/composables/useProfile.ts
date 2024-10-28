@@ -13,7 +13,7 @@ export const useProfile = () => {
     error.value = null;
 
     try {
-      const response = await authenticatedFetch(`${config.public.apiUrl}profile/${username}`);
+      const response = await authenticatedFetch(`${config.public.apiProtocol}://${config.public.apiUrl}/profile/${username}`);
 
       if (!response.ok) {
         throw createError({
@@ -41,7 +41,7 @@ export const useProfile = () => {
     error.value = null;
 
     try {
-      const response = await authenticatedFetch(`${config.public.apiUrl}profile/${username}`, {
+      const response = await authenticatedFetch(`${config.public.apiProtocol}://${config.public.apiUrl}/profile/${username}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -70,7 +70,7 @@ export const useProfile = () => {
     error.value = null;
 
     try {
-      const response = await authenticatedFetch(`${config.public.apiUrl}profile/${username}`, {
+      const response = await authenticatedFetch(`${config.public.apiProtocol}://${config.public.apiUrl}/profile/${username}`, {
         method: 'DELETE',
       });
 

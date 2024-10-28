@@ -1,3 +1,5 @@
+import { CubeType } from "./types.ts";
+
 export const generateScramble = (cube_type: CubeType) => {
 	if (
 		cube_type === CubeType.TWO_BY_TWO ||

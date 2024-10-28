@@ -1,3 +1,18 @@
+export enum SessionType {
+	SOLO = "solo",
+	MULTI = "multi",
+}
+export enum SessionState {
+	QUEUING = "queuing", // Multi only - waiting for opponent
+	SCRAMBLING = "scrambling",
+	SOLVING = "solving",
+	COMPLETE = "complete",
+}
+export enum CubeType {
+	THREE_BY_THREE = "3x3",
+	TWO_BY_TWO = "2x2",
+}
+
 declare global {
 	type WebSocketMessage = {
 		type:
@@ -9,20 +24,6 @@ declare global {
 			| "LEAVE";
 		payload?: any;
 	};
-	enum SessionType {
-		SOLO = "solo",
-		MULTI = "multi",
-	}
-	enum SessionState {
-		QUEUING = "queuing", // Multi only - waiting for opponent
-		SCRAMBLING = "scrambling",
-		SOLVING = "solving",
-		COMPLETE = "complete",
-	}
-	enum CubeType {
-		THREE_BY_THREE = "3x3",
-		TWO_BY_TWO = "2x2",
-	}
 	interface CompetitionState {
 		id: string;
 		type: SessionType;
