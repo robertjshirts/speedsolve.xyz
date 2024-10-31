@@ -44,7 +44,13 @@ export class CompetitionStateManager {
 	// Start solve
 	handleReady(username: string) {
 		const session = this.activeSessions.get(username);
-		if (!session || session.state !== SessionState.SCRAMBLING) return null;
+		if (!session || session.state !== SessionState.SCRAMBLING) {
+			this.notifyUser(username, {
+				type: "ERROR",
+				payload: `Invalid state, user ${username} is not in a valid state to start solving`,
+			});
+			return;
+		}
 
 		if (session.type === SessionType.SOLO) {
 			session.state = SessionState.SOLVING;
