@@ -1,41 +1,34 @@
-export enum SessionType {
-	SOLO = "solo",
-	MULTI = "multi",
-}
-export enum SessionState {
-	QUEUING = "queuing", // Multi only - waiting for opponent
-	SCRAMBLING = "scrambling",
-	SOLVING = "solving",
-	COMPLETE = "complete",
-}
-export enum CubeType {
-	THREE_BY_THREE = "3x3",
-	TWO_BY_TWO = "2x2",
-}
-
 declare global {
+	type SessionType = "solo" | "multi";
+	type SessionState = "queuing" | "scrambling" | "solving" | "complete";
+	type CubeType = "3x3" | "2x2";
+	type WebSocketMessageType =
+		| "MULTI_QUEUE"
+		| "SOLO_START"
+		| "READY"
+		| "SOLVE_COMPLETE"
+		| "PENALTY"
+		| "REMATCH"
+		| "LEAVE"
+		| "SESSION_UPDATE"
+		| "ERROR";
 	type WebSocketMessage = {
-		type:
-			| "SESSION_UPDATE"
-			| "SOLO_START"
-			| "MULTI_QUEUE"
-			| "READY"
-			| "SOLVE_COMPLETE"
-			| "REMATCH"
-			| "LEAVE";
+		type: WebSocketMessageType;
 		payload?: any;
 	};
-	interface CompetitionState {
+	type Result = {
+		id?: string;
+		time: number;
+		penalty: "DNF" | "plus2" | "none";
+	}
+	type CompetitionState = {
 		id: string;
 		type: SessionType;
 		state: SessionState;
 		cube_type: CubeType;
 		participants: string[];
 		scramble: string;
-		results: {
-			userId: string;
-			time: number;
-		}[];
+		results: Record<string, Result>;
 		start_time: number | null;
 	}
 }

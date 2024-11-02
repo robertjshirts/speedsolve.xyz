@@ -2,25 +2,23 @@
 import { ref, onMounted } from 'vue';
 import { useAuth } from '~/composables/useAuth';
 import { useAuthenticatedWebsocket } from '~/composables/useAuthenticatedWebsocket';
-import { CubeType, SessionState } from '~/types/competition';
+import { Result } from '#components'
 
 const config = useRuntimeConfig();
 const { loading, authenticated, login } = useAuth();
-const { timer, startTimer, stopTimer, resetTimer } = useTimer();
+const { timer, startTimer, stopTimer, resetTimer } = useCubeTimer();
 const { createWebSocket } = useAuthenticatedWebsocket();
-let session = ref<CompetitionState | null>(null);
+const modal = useModal();
+const session = ref<CompetitionState | null>(null);
 let ws: WebSocket;
 
 onMounted(async () => {
   ws = await createWebSocket(`wss://${config.public.apiUrl}/competition/ws`);
-  
+
   ws.onopen = () => {
-    ws.send(JSON.stringify({ 
-      type: 'SOLO_START', 
-      payload: { cubeType: CubeType.THREE_BY_THREE } 
-    }));
+    startSession();
   };
-  
+
   ws.onmessage = (event) => {
     const message = JSON.parse(event.data);
     if (message.type === 'SESSION_UPDATE') {
@@ -30,35 +28,47 @@ onMounted(async () => {
 });
 
 function updateSession(payload: CompetitionState) {
+  console.log(payload);
   session.value = payload;
+  if (payload.state === 'complete') {
+    modal.open(Result, {
+      session: payload
+    });
+  }
 }
 
 function startSession() {
   resetTimer();
-  ws.send(JSON.stringify({ 
-    type: 'SOLO_START', 
-    payload: { cubeType: CubeType.THREE_BY_THREE } 
-  }));
+  const message: WebSocketMessage = {
+    type: 'SOLO_START',
+    payload: { cube_type: "3x3" }
+  }
+  ws.send(JSON.stringify(message));
 }
 
 function startSolve() {
   startTimer();
-  ws.send(JSON.stringify({ type: 'READY' }));
+  const message: WebSocketMessage = {
+    type: 'READY',
+  }
+  ws.send(JSON.stringify(message));
 }
 
 function completeSolve() {
   stopTimer();
-  ws.send(JSON.stringify({ 
-    type: 'SOLVE_COMPLETE', 
-    payload: { time: timer.value } 
-  }));
+  const message: WebSocketMessage = {
+    type: 'SOLVE_COMPLETE',
+    payload: { time: timer.value }
+  }
+  ws.send(JSON.stringify(message));
 }
 
-function newSession() {
-  ws.send(JSON.stringify({ 
-    type: 'SOLO_START', 
-    payload: { cubeType: CubeType.THREE_BY_THREE } 
-  }));
+function updatePenalty() {
+  const message: WebSocketMessage = {
+    type: 'PENALTY',
+    payload: { penalty: 'plus2' }
+  }
+  ws.send(JSON.stringify(message));
 }
 </script>
 
@@ -83,7 +93,7 @@ function newSession() {
           <div class="w-full bg-gray-100 p-2 mb-4 rounded shadow-sm">
             <p class="text-center text-gray-800 font-mono text-xl">{{ session.scramble }}</p>
           </div>
-          
+
           <!-- Timer Display -->
           <div class="font-mono text-8xl flex-grow flex items-center">
             {{ timer.toFixed(2) }}
@@ -91,20 +101,13 @@ function newSession() {
 
           <!-- Control Buttons -->
           <div class="space-x-2">
-            <button v-if="session.state === SessionState.SCRAMBLING"
-                    @click="startSolve"
-                    class="px-4 py-2 bg-green-600 text-white text-lg rounded hover:bg-green-700">
+            <button v-if="session.state === 'scrambling'" @click="startSolve"
+              class="px-4 py-2 bg-green-600 text-white text-lg rounded hover:bg-green-700">
               Start
             </button>
-            <button v-else-if="session.state === SessionState.SOLVING"
-                    @click="completeSolve"
-                    class="px-4 py-2 bg-red-600 text-white text-lg rounded hover:bg-red-700">
+            <button v-else-if="session.state === 'solving'" @click="completeSolve"
+              class="px-4 py-2 bg-red-600 text-white text-lg rounded hover:bg-red-700">
               Stop
-            </button>
-            <button v-else
-                    @click="newSession"
-                    class="px-4 py-2 bg-blue-600 text-white text-lg rounded hover:bg-blue-700">
-              Next Solve
             </button>
           </div>
         </div>

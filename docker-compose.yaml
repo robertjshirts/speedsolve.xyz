@@ -39,6 +39,8 @@ services:
       - "traefik.http.services.profile-service.loadbalancer.healthcheck.timeout=3s"
   competition:
     build: ./services/competition/
+    ports:
+      - "8000:8000"
     container_name: competition
     labels:
       - "traefik.enable=true"

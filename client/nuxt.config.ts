@@ -8,7 +8,7 @@ export default defineNuxtConfig({
       enabled: true,
     },
   },
-  modules: ["@nuxtjs/tailwindcss", "@nuxthub/core"],
+  modules: ["@nuxthub/core", "@nuxt/ui"],
   ssr: false,
   runtimeConfig: {
     public: {
@@ -21,4 +21,3 @@ export default defineNuxtConfig({
     },
   },
 });
-

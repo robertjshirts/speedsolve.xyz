@@ -19,7 +19,7 @@ router.get(
 router.get(
 	"/competition/ws",
 	verifyAndParseJWT,
-	async (ctx: RouterContext<"/competition/ws">) => {
+	(ctx: RouterContext<"/competition/ws">) => {
 		if (!ctx.isUpgradable) {
 			ctx.throw(
 				STATUS_CODE.BadRequest,
@@ -40,7 +40,7 @@ router.get(
 			stateManager.handleDisconnect(username);
 		};
 
-		ws.onmessage = (event) => {
+		ws.onmessage = async (event) => {
 			try {
 				const message: WebSocketMessage = JSON.parse(event.data);
 
@@ -51,7 +51,7 @@ router.get(
 					case "SOLO_START":
 						stateManager.handleSoloStart(
 							username,
-							message.payload.cubeType,
+							message.payload.cube_type,
 						);
 						break;
 					case "READY":
@@ -63,8 +63,14 @@ router.get(
 							message.payload,
 						);
 						break;
+					case "PENALTY":
+						await stateManager.handlePenalty(
+							username,
+							message.payload.penalty,
+						);
+						break;
 					//case "MULTI_QUEUE":
-					//  stateManager.handleMultiQueue(username, message.payload.cubeType);
+					//  stateManager.handleMultiQueue(username, message.payload.cube_type);
 					//  break;
 					//case "LEAVE":
 					//  stateManager.handleLeave(username);
@@ -77,6 +83,10 @@ router.get(
 							`Unknown message type from ${username}:`,
 							message.type,
 						);
+						ws.send(JSON.stringify({
+							type: "ERROR",
+							payload: { message: "Unknown message type" },
+						}));
 				}
 			} catch (err) {
 				console.error(

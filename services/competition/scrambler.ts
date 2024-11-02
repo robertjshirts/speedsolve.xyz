@@ -1,9 +1,7 @@
-import { CubeType } from "./types.ts";
-
 export const generateScramble = (cube_type: CubeType) => {
 	if (
-		cube_type === CubeType.TWO_BY_TWO ||
-		cube_type === CubeType.THREE_BY_THREE
+		cube_type === "3x3" ||
+		cube_type === "2x2"
 	) {
 		const moves = ["R", "L", "U", "D", "F", "B"];
 		const modifiers = ["", "'", "2"];

@@ -1,12 +1,12 @@
 import { generateScramble } from "./scrambler.ts";
-import { CubeType, SessionState, SessionType } from "./types.ts";
+import { SessionDB, SolveDB } from "./models.ts";
 export class CompetitionStateManager {
 	// Session keys are usernames, because users can only be in one session at a time
 	// and it allows for easier parsing via jwt instead of session id
 	private activeSessions: Map<string, CompetitionState> = new Map();
 	private connections: Map<string, WebSocket> = new Map();
 	// Queues for multiplayer, when implemented
-	// private userQueues: Map<string, string[]> = new Map(); // cubeType -> usernames[]
+	// private userQueues: Map<string, string[]> = new Map(); // cube_type -> usernames[]
 
 	addConnection(username: string, ws: WebSocket) {
 		this.connections.set(username, ws);
@@ -25,12 +25,12 @@ export class CompetitionStateManager {
 	handleSoloStart(username: string, cube_type: CubeType) {
 		const session: CompetitionState = {
 			id: crypto.randomUUID(),
-			type: SessionType.SOLO,
-			state: SessionState.SCRAMBLING,
+			type: "solo",
+			state: "scrambling",
 			cube_type: cube_type,
 			participants: [username],
 			scramble: generateScramble(cube_type),
-			results: [],
+			results: {},
 			start_time: null,
 		};
 
@@ -44,16 +44,17 @@ export class CompetitionStateManager {
 	// Start solve
 	handleReady(username: string) {
 		const session = this.activeSessions.get(username);
-		if (!session || session.state !== SessionState.SCRAMBLING) {
+		if (!session || session.state !== "scrambling") {
 			this.notifyUser(username, {
 				type: "ERROR",
-				payload: `Invalid state, user ${username} is not in a valid state to start solving`,
+				payload:
+					`Invalid state, user ${username} is not in a valid state to start solving`,
 			});
 			return;
 		}
 
-		if (session.type === SessionType.SOLO) {
-			session.state = SessionState.SOLVING;
+		if (session.type === "solo") {
+			session.state = "solving";
 			session.start_time = Date.now();
 			this.notifyUser(username, {
 				type: "SESSION_UPDATE",
@@ -64,9 +65,18 @@ export class CompetitionStateManager {
 		}
 	}
 
-	handleSolveComplete(username: string, result: any) {
+	async handleSolveComplete(username: string, result: Result) {
 		const session = this.activeSessions.get(username);
-		if (!session || !session.start_time) return;
+		if (!session || !session.start_time) {
+			this.notifyUser(username, {
+				type: "ERROR",
+				payload:
+					`Invalid state, user ${username} is not in a valid state to complete a solve`,
+			});
+			return;
+		}
+
+		result.id = crypto.randomUUID();
 
 		const server_time = Date.now() - session.start_time;
 		const time_diff = Math.abs(server_time - result.time);
@@ -77,9 +87,10 @@ export class CompetitionStateManager {
 		}
 
 		// If solo, finish session
-		if (session.type === SessionType.SOLO) {
-			session.results = result;
-			session.state = SessionState.COMPLETE;
+		if (session.type === "solo") {
+			session.results[username] = result;
+			session.state = "complete";
+			await this.storeSession(session);
 			this.notifyUser(username, {
 				type: "SESSION_UPDATE",
 				payload: session,
@@ -87,7 +98,25 @@ export class CompetitionStateManager {
 		}
 	}
 
-	private notifyUser(username: string, payload: any) {
+	async handlePenalty(
+		username: string,
+		penalty: "DNF" | "plus2" | "none" = "none",
+	) {
+		const session = this.activeSessions.get(username);
+		if (!session || session.state !== "complete") {
+			this.notifyUser(username, {
+				type: "ERROR",
+				payload:
+					`User ${username} is not in a session to apply a penalty`,
+			});
+			return;
+		}
+
+		session.results[username].penalty = penalty;
+		await this.storeSession(session);
+	}
+
+	private notifyUser(username: string, payload: WebSocketMessage) {
 		console.log(`to ${username}: ${payload}`);
 		const ws = this.connections.get(username);
 		if (ws) {
@@ -95,11 +124,40 @@ export class CompetitionStateManager {
 		}
 	}
 
-	private storeSolve(
-		username: string,
+	private async storeSession(
 		session: CompetitionState,
-		payload: any,
 	) {
-		//TODO: impelement DAL
+		// Store session
+		await SessionDB.upsert({
+			id: session.id,
+			type: session.type,
+			player_one: session.participants[0],
+			player_two: session.participants[1] || null,
+			winner: this.getWinner(session),
+			cube_type: session.cube_type,
+		});
+
+		// Store all solves
+		Object.entries(session.results).forEach(async ([username, result]) => {
+			await SolveDB.upsert({
+				username,
+				id: result.id!,
+				session_id: session.id,
+				scramble: session.scramble,
+				time: result.time,
+				penalty: result.penalty,
+			});
+		});
+	}
+
+	private getWinner(session: CompetitionState): string | null {
+		let winner = null;
+		for (const [username, result] of Object.entries(session.results)) {
+			if (result.penalty === "DNF") continue;
+			if (!winner || result.time < session.results[winner].time) {
+				winner = username;
+			}
+		}
+		return winner;
 	}
 }
