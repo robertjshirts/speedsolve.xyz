@@ -14,7 +14,7 @@ const session = ref<CompetitionState | null>(null);
 let ws: WebSocket;
 
 onMounted(async () => {
-  ws = await createWebSocket(`ws://${config.public.apiUrl}/competition/ws`);
+  ws = await createWebSocket(`${config.public.wsProtocol}://${config.public.apiUrl}/competition/ws`);
 
   ws.onopen = () => {
     startSession();
