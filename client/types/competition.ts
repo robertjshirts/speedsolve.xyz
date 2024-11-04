@@ -16,10 +16,11 @@ declare global {
 		type: WebSocketMessageType;
 		payload?: any;
 	};
+	type Penalty = "DNF" | "plus2" | "none";
 	type Result = {
 		id?: string;
 		time: number;
-		penalty: "DNF" | "plus2" | "none";
+		penalty: Penalty;
 	}
 	type CompetitionState = {
 		id: string;

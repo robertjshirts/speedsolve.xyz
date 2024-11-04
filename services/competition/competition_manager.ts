@@ -114,6 +114,10 @@ export class CompetitionStateManager {
 
 		session.results[username].penalty = penalty;
 		await this.storeSession(session);
+		this.notifyUser(username, {
+			type: "SESSION_UPDATE",
+			payload: session,
+		});
 	}
 
 	private notifyUser(username: string, payload: WebSocketMessage) {

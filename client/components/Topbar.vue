@@ -5,7 +5,7 @@ const { loading, authenticated, username, login, logout } = useAuth();
 </script>
 
 <template>
-  <div class="fixed top-0 z-50 w-full border-b bg-white bg-opacity-80 backdrop-blur">
+  <div class="fixed top-0 z-50 w-full border-b-2 border-indigo-600">
     <div class="mx-auto flex max-w-screen-xl items-center justify-between px-4 py-3">
       <NuxtLink to="/" class="text-xl font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer">
         Speedsolve.xyz

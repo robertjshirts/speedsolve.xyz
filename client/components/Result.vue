@@ -1,105 +1,75 @@
 <script setup lang="ts">
 const modal = useModal();
 const { username } = useAuth();
+const { formatTime } = useTimeFormat();
 
 const props = defineProps<{
   session: CompetitionState;
 }>();
-
+const emit = defineEmits<{
+  'updatePenalty': [type: Penalty];
+  'close': [];
+}>();
 
 function closeModal() {
+  emit('close');
   modal.close();
 }
 
-defineEmits(['update-penalty']);
+
+// might not need to be computed.
+const timeWithPenalty = computed(() => {
+  let time = props.session.results[username.value].time;
+  let penalty = props.session.results[username.value].penalty;
+  if (penalty === 'plus2') {
+    time += 2000;
+    return `${formatTime(time)}+`;
+  }
+  if (penalty === 'DNF') {
+    return `DNF(${formatTime(time)})`;
+  }
+  return formatTime(time);
+})
+
+
 </script>
 
 
 <template>
-  <UModal :overlay="false">
-    <div class="w-full max-w-md rounde-lg shadow-xl">
-      <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
-              Modal
-            </h3>
-            <UButton color="gray" variant="ghost" icon="i-heroicons-x-mark-20-solid" class="-my-1"
-              @click="closeModal" />
-          </div>
-        </template>
-
-        <div class="p-6">
-          <h2 class="text-lg font-medium text-gray-900 text-center">
+  <UModal>
+    <UCard :ui="{ ring: '', divide: 'divide-y divide-gray-100 dark:divide-gray-800' }">
+      <template #header>
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-semibold leading-6 text-gray-900 dark:text-white">
             Solve Complete
-          </h2>
-          <h4>
-            {{ session.results[username].time.toFixed(2) }}s
-          </h4>
-          <span class="text-sm text-gray-600">Penalty: {{ session.results[username].penalty }}</span>
-
-          <div class="mt-4">
-            <div class="text-4xl font-mono text-center py-4">
-              {{ session.results[username].time.toFixed(2) }}s
-            </div>
-
-            <label class="text-sm font-medium text-gray-700 block mb-2">Update Penalty:</label>
-            <div class="space-x-4">
-              <button @click="$emit('update-penalty', 'none')"
-                class="px-4 py-2 bg-green-600 text-white text-lg rounded hover:bg-green-700">
-                None
-              </button>
-              <button @click="$emit('update-penalty', 'plus2')"
-                class="px-4 py-2 bg-blue-600 text-white text-lg rounded hover:bg-blue-700">
-                +2
-              </button>
-              <button @click="$emit('update-penalty', 'DNF')"
-                class="px-4 py-2 bg-red-600 text-white text-lg rounded hover:bg-red-700">
-                DNF
-              </button>
-            </div>
-          </div>
+          </h3>
+          <UButton color="gray" variant="ghost" icon="i-heroicons-x-mark-20-solid" class="-my-1" @click="closeModal" />
         </div>
-      </UCard>
-    </div>
-  </UModal>
+      </template>
 
-  <!-- 
-  <div class="fixed inset-0 overflow-y-auto">
-    <div class="flex min-h-full items-center justify-center p-4">
-      <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-        <h2 class="text-lg font-medium text-gray-900 text-center">
-          Solve Complete
-        </h2>
-        <h4>
-          {{ session.results[username].time.toFixed(2) }}s
-        </h4>
-        <span class="text-sm text-gray-600">Penalty: {{ session.results[username].penalty }}</span>
+      <div class="p-6">
+        <div class="text-6xl font-mono text-center py-4">
+          {{ timeWithPenalty }}
+        </div>
 
-        <div class="mt-4">
-          <div class="text-4xl font-mono text-center py-4">
-            {{ session.results[username].time.toFixed(2) }}s
-          </div>
 
-          <label class="text-sm font-medium text-gray-700 block mb-2">Update Penalty:</label>
-          <div class="space-x-4">
-            <button @click="$emit('update-penalty', 'none')"
-              class="px-4 py-2 bg-green-600 text-white text-lg rounded hover:bg-green-700">
-              None
-            </button>
-            <button @click="$emit('update-penalty', 'plus2')"
-              class="px-4 py-2 bg-blue-600 text-white text-lg rounded hover:bg-blue-700">
-              +2
-            </button>
-            <button @click="$emit('update-penalty', 'DNF')"
-              class="px-4 py-2 bg-red-600 text-white text-lg rounded hover:bg-red-700">
-              DNF
-            </button>
-          </div>
+
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-400 block mb-2">Update Penalty:</label>
+        <div class="space-x-4">
+          <button @click="$emit('updatePenalty', 'none')"
+            class="px-4 py-2 bg-green-600 text-white text-lg rounded hover:bg-green-700">
+            None
+          </button>
+          <button @click="$emit('updatePenalty', 'plus2')"
+            class="px-4 py-2 bg-blue-600 text-white text-lg rounded hover:bg-blue-700">
+            +2
+          </button>
+          <button @click="$emit('updatePenalty', 'DNF')"
+            class="px-4 py-2 bg-red-600 text-white text-lg rounded hover:bg-red-700">
+            DNF
+          </button>
         </div>
       </div>
-    </div>
-  </div>
-  </div>
--->
+    </UCard>
+  </UModal>
 </template>
