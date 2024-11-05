@@ -2,6 +2,7 @@ declare global {
 	type SessionType = "solo" | "multi";
 	type SessionState = "queuing" | "scrambling" | "solving" | "complete";
 	type CubeType = "3x3" | "2x2";
+	type ConnectionState = "disconnected" | "connecting" | "connected";
 	type WebSocketMessageType =
 		| "MULTI_QUEUE"
 		| "SOLO_START"

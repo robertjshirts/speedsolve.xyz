@@ -8,7 +8,7 @@ export default defineNuxtConfig({
       enabled: true,
     },
   },
-  modules: ["@nuxthub/core", "@nuxt/ui"],
+  modules: ["@nuxthub/core", "@nuxt/ui", "@pinia/nuxt"],
   ssr: false,
   runtimeConfig: {
     public: {

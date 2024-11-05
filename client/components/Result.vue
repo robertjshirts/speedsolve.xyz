@@ -1,39 +1,39 @@
 <script setup lang="ts">
-const modal = useModal();
-const { username } = useAuth();
-const { formatTime } = useTimeFormat();
+const modal = useModal()
+const { username } = useAuth()
+const { formatTime } = useTimeFormat()
+const store = useCompetitionStore()
+const { updatePenalty } = useCompetition()
 
-const props = defineProps<{
-  session: CompetitionState;
-}>();
 const emit = defineEmits<{
-  'updatePenalty': [type: Penalty];
-  'close': [];
-}>();
+  close: []
+}>()
 
 function closeModal() {
-  emit('close');
-  modal.close();
+  emit('close')
+  modal.close()
 }
 
+function handlePenaltyUpdate(penalty: Penalty) {
+  updatePenalty(penalty)
+}
 
-// might not need to be computed.
 const timeWithPenalty = computed(() => {
-  let time = props.session.results[username.value].time;
-  let penalty = props.session.results[username.value].penalty;
+  if (!store.session?.results[username.value]) return '--:--'
+
+  let time = store.session.results[username.value].time
+  let penalty = store.session.results[username.value].penalty
+
   if (penalty === 'plus2') {
-    time += 2000;
-    return `${formatTime(time)}+`;
+    time += 2000
+    return `${formatTime(time)}+`
   }
   if (penalty === 'DNF') {
-    return `DNF(${formatTime(time)})`;
+    return `DNF(${formatTime(time)})`
   }
-  return formatTime(time);
+  return formatTime(time)
 })
-
-
 </script>
-
 
 <template>
   <UModal>
@@ -52,21 +52,22 @@ const timeWithPenalty = computed(() => {
           {{ timeWithPenalty }}
         </div>
 
+        <label class="text-sm font-medium text-gray-700 dark:text-gray-400 block mb-2">
+          Update Penalty:
+        </label>
 
-
-        <label class="text-sm font-medium text-gray-700 dark:text-gray-400 block mb-2">Update Penalty:</label>
         <div class="space-x-4">
-          <button @click="$emit('updatePenalty', 'none')"
-            class="px-4 py-2 bg-green-600 text-white text-lg rounded hover:bg-green-700">
-            None
-          </button>
-          <button @click="$emit('updatePenalty', 'plus2')"
-            class="px-4 py-2 bg-blue-600 text-white text-lg rounded hover:bg-blue-700">
-            +2
-          </button>
-          <button @click="$emit('updatePenalty', 'DNF')"
-            class="px-4 py-2 bg-red-600 text-white text-lg rounded hover:bg-red-700">
-            DNF
+          <button v-for="(label, type) in {
+            none: 'None',
+            plus2: '+2',
+            DNF: 'DNF'
+          }" :key="type" @click="handlePenaltyUpdate(type as Penalty)" class="px-4 py-2 text-white text-lg rounded"
+            :class="{
+              'bg-green-600 hover:bg-green-700': type === 'none',
+              'bg-blue-600 hover:bg-blue-700': type === 'plus2',
+              'bg-red-600 hover:bg-red-700': type === 'DNF'
+            }">
+            {{ label }}
           </button>
         </div>
       </div>

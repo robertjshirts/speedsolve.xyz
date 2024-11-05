@@ -13,8 +13,10 @@
     "@auth0/auth0-vue": "^2.3.3",
     "@nuxt/ui": "^2.18.7",
     "@nuxthub/core": "^0.7.23",
+    "@pinia/nuxt": "^0.7.0",
     "nuxt": "^3.13.0",
-    "vue": "latest",
+    "pinia": "^2.2.6",
+    "vue": "^3.5.11",
     "vue-router": "latest"
   },
   "devDependencies": {
