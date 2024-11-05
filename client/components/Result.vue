@@ -15,10 +15,13 @@ function closeModal() {
 }
 
 function handlePenaltyUpdate(penalty: Penalty) {
+  console.log('penalty', penalty)
   updatePenalty(penalty)
 }
 
 const timeWithPenalty = computed(() => {
+  console.log('in Result.vue, computed property updated')
+
   if (!store.session?.results[username.value]) return '--:--'
 
   let time = store.session.results[username.value].time

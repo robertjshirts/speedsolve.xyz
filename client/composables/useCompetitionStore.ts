@@ -7,10 +7,12 @@ export const useCompetitionStore = defineStore('competition', () => {
   // State
   const session = ref<CompetitionState | null>(null)
   const connectionState = ref<ConnectionState>('disconnected')
+  const ws = ref<WebSocket | null>(null)
   const error = ref<string | null>(null)
 
   // Getters
-  const isActive = computed(() => session.value !== null)
+  const isWebsocketConnected = computed(() => connectionState.value === 'connected')
+  const isSessionActive = computed(() => session.value !== null)
   const currentState = computed(() => session.value?.state || null)
   const currentScramble = computed(() => session.value?.scramble || '')
   const canStart = computed(() =>
@@ -29,6 +31,10 @@ export const useCompetitionStore = defineStore('competition', () => {
   })
 
   // Actions
+  function setWebSocket(websocket: WebSocket) {
+    ws.value = websocket
+  }
+  
   function updateSession(newSession: CompetitionState) {
     session.value = newSession
   }
@@ -54,13 +60,15 @@ export const useCompetitionStore = defineStore('competition', () => {
 
   return {
     // State
+    ws,
     session,
     connectionState,
     error,
     competitors,
 
     // Getters
-    isActive,
+    isWebsocketConnected,
+    isSessionActive,
     currentState,
     currentScramble,
     canStart,
@@ -68,6 +76,7 @@ export const useCompetitionStore = defineStore('competition', () => {
     penalty,
 
     // Actions
+    setWebSocket,
     updateSession,
     setConnectionState,
     setError,
