@@ -6,7 +6,11 @@ import router from "./routes.ts";
 
 const app = new Application();
 
-const ALLOWED_ORIGINS = ["http://localhost:3000", "https://speedsolve.xyz"];
+const ALLOWED_ORIGINS = [
+	"http://localhost:3000",
+	"http://localhost:3001",
+	"https://speedsolve.xyz",
+];
 app.use(async (ctx, next) => {
 	const origin = ctx.request.headers.get("origin");
 	if (origin && ALLOWED_ORIGINS.includes(origin)) {
