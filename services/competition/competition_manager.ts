@@ -6,7 +6,7 @@ export class CompetitionStateManager {
 	private activeSessions: Map<string, CompetitionState> = new Map();
 	private connections: Map<string, WebSocket> = new Map();
 	// Queues for multiplayer, when implemented
-	private userQueues: Map<string, string[]> = new Map(); // cube_type -> usernames[]
+	private userQueues: Map<string, Set<string>> = new Map(); // cube_type -> usernames[]
 
 	addConnection(username: string, ws: WebSocket) {
 		this.connections.set(username, ws);
@@ -34,17 +34,21 @@ export class CompetitionStateManager {
 		console.log(`User ${username} enqueued for ${cube_type}`);
 		const queue = this.userQueues.get(cube_type);
 		if (!queue) {
-			this.userQueues.set(cube_type, [username]);
+			this.userQueues.set(cube_type, new Set([username]));
 		} else {
-			queue.push(username);
-			if (queue.length === 2) {
-				console.log(`Starting session for ${queue[0]} and ${queue[1]}`);
+			if (queue.has(username)) {
+				return;
+			}
+			queue.add(username);
+			if (queue.size >= 2) {
+				const participants = Array.from(queue.values()).slice(0, 2);
+				console.log(`Starting session for ${participants[0]} and ${participants[1]}`);
 				const session: CompetitionState = {
 					id: crypto.randomUUID(),
 					type: "multi",
 					state: "scrambling",
 					cube_type: cube_type,
-					participants: new Set([queue[0], queue[1]]),
+					participants: new Set(participants),
 					readyParticipants: new Set(),
 					scramble: generateScramble(cube_type),
 					results: {},
