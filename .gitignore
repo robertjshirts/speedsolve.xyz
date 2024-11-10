@@ -1,4 +1,5 @@
 *.log
+.vite/
 node_modules/
 .nuxt/
 client/.data/hub
