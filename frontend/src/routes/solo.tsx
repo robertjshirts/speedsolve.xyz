@@ -1,51 +1,69 @@
+// Authentication and routing imports
 import { useAuth0 } from '@auth0/auth0-react'
+import { createFileRoute } from '@tanstack/react-router'
+
+// React core imports
+import { useState, useEffect, useRef } from 'react'
+
+// Custom hooks for timer and competition management
 import { useCubeTimer } from '../hooks/useCubeTimer'
+import { useSoloCompetition } from '../hooks/useSoloCompetition'
+
+// Component imports
 import { Scramble } from '../components/Scramble'
 import { Timer } from '../components/Timer'
-import type { CompetitionState } from '../api/solo'
-import { useSoloCompetition } from '../hooks/useSoloCompetition'
-import { createFileRoute } from '@tanstack/react-router'
-import { useState, useEffect, useRef } from 'react'
 import { SoloResult } from '../components/SoloResult'
 import { CubePreview3d } from '../components/CubePreview3d'
 
+// Type imports
+import type { CompetitionState } from '../api/solo'
+
+// Create the route definition for the solo solving page
 export const Route = createFileRoute('/solo')({
   component: SoloComponent,
 })
 
 function SoloComponent() {
-  const { isLoading, isAuthenticated, loginWithRedirect } = useAuth0();
+  // Auth0 authentication hooks
+  const { isLoading, isAuthenticated, loginWithRedirect, getAccessTokenSilently } = useAuth0();
+
+  // Timer state management from custom hook
   const { 
-    time, 
-    startTimer, 
-    stopTimer, 
-    resetTimer, 
+    time,           // Current time value (reactive)
+    startTimer,     // Function to start the timer
+    stopTimer,      // Function to stop the timer
+    resetTimer,     // Function to reset the timer
   } = useCubeTimer();
-  const [session, setSession] = useState<CompetitionState | null>(null);
-  const [currentState, setCurrentState] = useState<SessionState>('scrambling');
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const { getAccessTokenSilently } = useAuth0();
-  
+
+  // Local state management
+  const [session, setSession] = useState<CompetitionState | null>(null);        // Current solving session state
+  const [currentState, setCurrentState] = useState<SessionState>('scrambling'); // Current solve state (scrambling/solving)
+  const [isModalOpen, setIsModalOpen] = useState(false);                        // Controls result modal visibility
+
+  // Competition management hook with session update callback
   const { 
-    connectionState, 
-    error, 
-    initialize, 
-    startSolve: apiStartSolve, 
-    completeSolve: apiCompleteSolve,
-    startSession: apiStartSession,
-    updatePenalty: apiUpdatePenalty
+    connectionState,    // Current WebSocket connection state
+    error,             // Any error messages
+    initialize: apiInitializeConnection,  // Function to initialize WebSocket connection
+    startSolve: apiStartSolve,           // API call to start a solve
+    completeSolve: apiCompleteSolve,     // API call to complete a solve
+    startSession: apiStartSession,        // API call to start a new session
+    updatePenalty: apiUpdatePenalty      // API call to update solve penalty
   } = useSoloCompetition((session) => setSession(session));
 
+  // Initialize WebSocket connection when component mounts or auth state changes
   useEffect(() => {
-    initialize(`wss://api.speedsolve.xyz/competition/ws`);
-  }, [isAuthenticated, initialize]);
+    apiInitializeConnection(`wss://api.speedsolve.xyz/competition/ws`);
+  }, [isAuthenticated, apiInitializeConnection]);
 
+  // Update local state when session state changes
   useEffect(() => {
     if (session) {
       setCurrentState(session.state);
     }
   }, [session]);
 
+  // Handler for starting a new solve
   const handleStartSolve = () => {
     if (connectionState !== 'connected') return;
 
@@ -54,6 +72,7 @@ function SoloComponent() {
     apiStartSolve();
   };
 
+  // Handler for completing a solve
   const handleCompleteSolve = () => {
     if (connectionState !== 'connected') return;
 
@@ -63,6 +82,7 @@ function SoloComponent() {
     setIsModalOpen(true);
   };
 
+  // Handler for starting a new session
   const handleNewSession = () => {
     if (connectionState !== 'connected') return;
 
@@ -71,11 +91,13 @@ function SoloComponent() {
     setIsModalOpen(false);
   };
 
+  // Handler for updating solve penalties
   const handlePenaltyChange = (penalty: Penalty) => {
     if (connectionState !== 'connected') return;
     apiUpdatePenalty(penalty);
   };
 
+  // Loading state render
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center h-screen">
@@ -84,6 +106,7 @@ function SoloComponent() {
     );
   }
 
+  // Unauthenticated state render
   if (!isAuthenticated) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -97,6 +120,7 @@ function SoloComponent() {
     );
   }
 
+  // Error state render when no session is available
   if (!session) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -107,9 +131,11 @@ function SoloComponent() {
     );
   }
 
+  // Main component render
   return (
     <div className="flex flex-row">
       <div className="grow flex flex-col items-center">
+        {/* Connection status banner */}
         {connectionState !== 'connected' && (
           <div
             className={`w-full p-2 text-center text-skin-base ${
@@ -122,18 +148,22 @@ function SoloComponent() {
           </div>
         )}
         
+        {/* Error message display */}
         {error && (
           <div className="w-full p-2 bg-skin-accent text-skin-base text-center">
             {error}
           </div>
         )}
 
+        {/* Scramble display */}
         <Scramble scramble={session.scramble} />
         
+        {/* 3D cube preview (only shown during scrambling) */}
         {currentState === 'scrambling' && (
           <CubePreview3d scramble={session.scramble} />
         )}
 
+        {/* Timer component */}
         <Timer
           time={time}
           onStart={handleStartSolve}
@@ -142,6 +172,7 @@ function SoloComponent() {
           currentState={currentState}
         />
 
+        {/* Results modal */}
         <SoloResult
           isOpen={isModalOpen}
           onClose={handleNewSession}

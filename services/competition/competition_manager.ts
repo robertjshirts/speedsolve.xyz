@@ -17,10 +17,16 @@ export class CompetitionStateManager {
 	handleDisconnect(username: string) {
 		const session = this.activeSessions.get(username);
 		if (session) {
-			this.notifySession(session, {
-				type: "ERROR",
-				payload: `User ${username} disconnected`,
-			});
+			// Notify only other participants in the session
+			for (const participant of session.participants) {
+				if (participant !== username) {  // Skip the disconnected user
+					this.notifyUser(participant, {
+						type: "ERROR",
+						payload: `User ${username} disconnected`,
+					});
+				}
+			}
+			// Clean up session for all participants
 			for (const participant of session.participants) {
 				this.activeSessions.delete(participant);
 			}
@@ -32,35 +38,68 @@ export class CompetitionStateManager {
 	// Handle enqueueing for multiplayer
 	handleMultiQueue(username: string, cube_type: CubeType) {
 		console.log(`User ${username} enqueued for ${cube_type}`);
+		
+		// Check if user is in an active session
+		if (this.activeSessions.has(username)) {
+			this.notifyUser(username, {
+				type: "ERROR",
+				payload: "Cannot queue while in an active session",
+			});
+			return;
+		}
+
+		// Check if user is already in any queue
+		for (const [queueType, queue] of this.userQueues.entries()) {
+			if (queue.has(username)) {
+				this.notifyUser(username, {
+					type: "ERROR",
+					payload: `Already queued for ${queueType}`,
+				});
+				return;
+			}
+		}
+
+		// Create initial session for queuing user
+		const initialSession: CompetitionState = {
+			id: crypto.randomUUID(),
+			type: "multi",
+			state: "queuing",
+			cube_type: cube_type,
+			participants: new Set([username]),
+			readyParticipants: new Set(),
+			scramble: "", // Will be generated when players are matched
+			results: {},
+			start_time: null,
+		};
+
+		this.activeSessions.set(username, initialSession);
+		this.notifySession(initialSession, {
+			type: "SESSION_UPDATE",
+			payload: initialSession,
+		});
+
 		const queue = this.userQueues.get(cube_type);
 		if (!queue) {
 			this.userQueues.set(cube_type, new Set([username]));
-			this.notifyUser(username, {
-				type: "QUEUE_CONFIRMED",
-			});
 		} else {
-			if (queue.has(username)) {
-				return;
-			}
 			queue.add(username);
 			if (queue.size >= 2) {
 				const participants = Array.from(queue.values()).slice(0, 2);
-				console.log(`Starting session for ${participants[0]} and ${participants[1]}`);
-				const session: CompetitionState = {
-					id: crypto.randomUUID(),
-					type: "multi",
-					state: "scrambling",
-					cube_type: cube_type,
-					participants: new Set(participants),
-					readyParticipants: new Set(),
-					scramble: generateScramble(cube_type),
-					results: {},
-					start_time: null,
-				};
+				console.log(`Matching players ${participants[0]} and ${participants[1]}`);
+				
+				// Get the first player's session and update it with the second player
+				const session = this.activeSessions.get(participants[0])!;
+				session.participants.add(participants[1]);
+				session.state = "scrambling";
+				session.scramble = generateScramble(cube_type);
 
-				for (const participant of session.participants) {
-					this.activeSessions.set(participant, session);
-				}
+				// Remove matched players from queue
+				participants.forEach(participant => {
+					queue.delete(participant);
+				});
+
+				// Update second player's session reference
+				this.activeSessions.set(participants[1], session);
 
 				this.notifySession(session, {
 					type: "SESSION_UPDATE",
@@ -72,6 +111,26 @@ export class CompetitionStateManager {
 
 	// Solo session management
 	handleSoloStart(username: string, cube_type: CubeType) {
+		// Check if user is already in a session
+		if (this.activeSessions.has(username)) {
+			this.notifyUser(username, {
+				type: "ERROR",
+				payload: "Cannot start a new session while in an active session",
+			});
+			return;
+		}
+
+		// Check if user is in any queue
+		for (const [queueType, queue] of this.userQueues.entries()) {
+			if (queue.has(username)) {
+				this.notifyUser(username, {
+					type: "ERROR",
+					payload: `Cannot start a solo session while queued for ${queueType}`,
+				});
+				return;
+			}
+		}
+
 		const session: CompetitionState = {
 			id: crypto.randomUUID(),
 			type: "solo",
@@ -212,7 +271,7 @@ export class CompetitionStateManager {
 
 	private notifyUser(username: string, payload: WebSocketMessage) {
 		const ws = this.connections.get(username);
-		if (ws) {
+		if (ws && ws.readyState === 1) { // Check if WebSocket is OPEN (readyState === 1)
 			ws.send(JSON.stringify(payload));
 		}
 	}

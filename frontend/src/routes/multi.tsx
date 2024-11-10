@@ -9,11 +9,11 @@ export const Route = createFileRoute('/multi')({
 
 function RouteComponent() {
   const [session, setSession] = React.useState<CompetitionState | null>(null)
-  const { connectionState, error, initialize, startQueue } = useMultiCompetition((updatedSession) => setSession(updatedSession))
+  const { connectionState, error, initialize: apiInitializeConnection, startQueue } = useMultiCompetition((updatedSession) => setSession(updatedSession))
 
   React.useEffect(() => {
-    initialize('wss://api.speedsolve.xyz/competition/ws')
-  }, [initialize])
+    apiInitializeConnection('wss://api.speedsolve.xyz/competition/ws')
+  }, [apiInitializeConnection])
 
   return (
     <div>

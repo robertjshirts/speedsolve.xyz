@@ -25,7 +25,7 @@ export function Topbar() {
             Solo
           </Link>
           <Link
-            to="/"
+            to="/multi"
             className="text-skin-base hover:text-skin-accent transition duration-150 ease-in-out px-5"
             activeProps={{
               className: 'text-skin-accent'
