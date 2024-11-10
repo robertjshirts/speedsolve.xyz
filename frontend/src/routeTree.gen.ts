@@ -12,6 +12,8 @@
 
 import { Route as rootRoute } from './routes/__root'
 import { Route as SoloImport } from './routes/solo'
+import { Route as QueueImport } from './routes/queue'
+import { Route as MultiImport } from './routes/multi'
 import { Route as AboutImport } from './routes/about'
 import { Route as IndexImport } from './routes/index'
 import { Route as PUsernameImport } from './routes/p.$username'
@@ -21,6 +23,18 @@ import { Route as PUsernameImport } from './routes/p.$username'
 const SoloRoute = SoloImport.update({
   id: '/solo',
   path: '/solo',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const QueueRoute = QueueImport.update({
+  id: '/queue',
+  path: '/queue',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const MultiRoute = MultiImport.update({
+  id: '/multi',
+  path: '/multi',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -60,6 +74,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutImport
       parentRoute: typeof rootRoute
     }
+    '/multi': {
+      id: '/multi'
+      path: '/multi'
+      fullPath: '/multi'
+      preLoaderRoute: typeof MultiImport
+      parentRoute: typeof rootRoute
+    }
+    '/queue': {
+      id: '/queue'
+      path: '/queue'
+      fullPath: '/queue'
+      preLoaderRoute: typeof QueueImport
+      parentRoute: typeof rootRoute
+    }
     '/solo': {
       id: '/solo'
       path: '/solo'
@@ -82,6 +110,8 @@ declare module '@tanstack/react-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/multi': typeof MultiRoute
+  '/queue': typeof QueueRoute
   '/solo': typeof SoloRoute
   '/p/$username': typeof PUsernameRoute
 }
@@ -89,6 +119,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/multi': typeof MultiRoute
+  '/queue': typeof QueueRoute
   '/solo': typeof SoloRoute
   '/p/$username': typeof PUsernameRoute
 }
@@ -97,22 +129,33 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
+  '/multi': typeof MultiRoute
+  '/queue': typeof QueueRoute
   '/solo': typeof SoloRoute
   '/p/$username': typeof PUsernameRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/about' | '/solo' | '/p/$username'
+  fullPaths: '/' | '/about' | '/multi' | '/queue' | '/solo' | '/p/$username'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/about' | '/solo' | '/p/$username'
-  id: '__root__' | '/' | '/about' | '/solo' | '/p/$username'
+  to: '/' | '/about' | '/multi' | '/queue' | '/solo' | '/p/$username'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/multi'
+    | '/queue'
+    | '/solo'
+    | '/p/$username'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
+  MultiRoute: typeof MultiRoute
+  QueueRoute: typeof QueueRoute
   SoloRoute: typeof SoloRoute
   PUsernameRoute: typeof PUsernameRoute
 }
@@ -120,6 +163,8 @@ export interface RootRouteChildren {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
+  MultiRoute: MultiRoute,
+  QueueRoute: QueueRoute,
   SoloRoute: SoloRoute,
   PUsernameRoute: PUsernameRoute,
 }
@@ -136,6 +181,8 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/about",
+        "/multi",
+        "/queue",
         "/solo",
         "/p/$username"
       ]
@@ -145,6 +192,12 @@ export const routeTree = rootRoute
     },
     "/about": {
       "filePath": "about.tsx"
+    },
+    "/multi": {
+      "filePath": "multi.tsx"
+    },
+    "/queue": {
+      "filePath": "queue.tsx"
     },
     "/solo": {
       "filePath": "solo.tsx"

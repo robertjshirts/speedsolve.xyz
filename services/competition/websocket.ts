@@ -1,6 +1,5 @@
 import { STATUS_CODE } from "status";
 import { Router, type RouterContext } from "oak";
-import { generateScramble } from "./scrambler.ts";
 import { verifyAndParseJWT } from "./auth.ts";
 import { computeUserAverage } from "./average.ts";
 import { CompetitionStateManager } from "./competition_manager.ts";
@@ -84,9 +83,12 @@ router.get(
 							message.payload.penalty,
 						);
 						break;
-					//case "MULTI_QUEUE":
-					//  stateManager.handleMultiQueue(username, message.payload.cube_type);
-					//  break;
+					case "MULTI_QUEUE":
+						stateManager.handleMultiQueue(
+							username,
+							message.payload.cube_type,
+						);
+						break;
 					//case "LEAVE":
 					//  stateManager.handleLeave(username);
 					//  break;

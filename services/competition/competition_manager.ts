@@ -21,15 +21,16 @@ export class CompetitionStateManager {
 				type: "ERROR",
 				payload: `User ${username} disconnected`,
 			});
-			this.activeSessions.delete(session.participants[0]);
-			this.activeSessions.delete(session.participants[1]);
+			for (const participant of session.participants) {
+				this.activeSessions.delete(participant);
+			}
 		}
 		this.connections.delete(username);
 		this.removeFromQueue(username);
 	}
 
 	// Handle enqueueing for multiplayer
-	handleEnqueue(username: string, cube_type: CubeType) {
+	handleMultiQueue(username: string, cube_type: CubeType) {
 		console.log(`User ${username} enqueued for ${cube_type}`);
 		const queue = this.userQueues.get(cube_type);
 		if (!queue) {
@@ -43,17 +44,16 @@ export class CompetitionStateManager {
 					type: "multi",
 					state: "scrambling",
 					cube_type: cube_type,
-					participants: [queue[0], queue[1]],
-					readyParticipants: [],
+					participants: new Set([queue[0], queue[1]]),
+					readyParticipants: new Set(),
 					scramble: generateScramble(cube_type),
 					results: {},
 					start_time: null,
 				};
 
-				// TODO: Start from here tomorrow
-
-				this.activeSessions.set(queue[0], session);
-				this.activeSessions.set(queue[1], session);
+				for (const participant of session.participants) {
+					this.activeSessions.set(participant, session);
+				}
 
 				this.notifySession(session, {
 					type: "SESSION_UPDATE",
@@ -70,7 +70,7 @@ export class CompetitionStateManager {
 			type: "solo",
 			state: "scrambling",
 			cube_type: cube_type,
-			participants: [username],
+			participants: new Set([username]),
 			scramble: generateScramble(cube_type),
 			results: {},
 			start_time: null,
@@ -98,13 +98,23 @@ export class CompetitionStateManager {
 		if (session.type === "solo") {
 			session.state = "solving";
 			session.start_time = Date.now();
-			this.notifySession(session, {
-				type: "SESSION_UPDATE",
-				payload: session,
-			});
 		} else {
-			// TODO: implement this
+			if (!session.readyParticipants) {
+				session.readyParticipants = new Set<string>();
+			}
+			
+			session.readyParticipants?.add(username);
+
+			if (session.readyParticipants?.size === session.participants.size) {
+				session.state = "solving";
+				session.start_time = Date.now();
+			}
 		}
+
+		this.notifySession(session, {
+			type: "SESSION_UPDATE",
+			payload: session,
+		});
 	}
 
 	async handleSolveComplete(username: string, result: Result) {
@@ -112,8 +122,7 @@ export class CompetitionStateManager {
 		if (!session || !session.start_time) {
 			this.notifySession(session!, {
 				type: "ERROR",
-				payload:
-					`Invalid state, user ${username} is not in a valid state to complete a solve`,
+				payload: `Invalid state, user ${username} is not in a valid state to complete a solve`,
 			});
 			return;
 		}
@@ -137,6 +146,24 @@ export class CompetitionStateManager {
 				type: "SESSION_UPDATE",
 				payload: session,
 			});
+		} else {
+			// Multiplayer implementation
+			session.results[username] = result;
+			
+			// Check if all participants have completed their solves
+			const allCompleted = Array.from(session.participants).every(
+				participant => session.results[participant]
+			);
+
+			if (allCompleted) {
+				session.state = "complete";
+				await this.storeSession(session);
+			}
+
+			this.notifySession(session, {
+				type: "SESSION_UPDATE",
+				payload: session,
+			});
 		}
 	}
 
@@ -145,7 +172,7 @@ export class CompetitionStateManager {
 		penalty: "DNF" | "plus2" | "none" = "none",
 	) {
 		const session = this.activeSessions.get(username);
-		if (!session || session.state !== "complete") {
+		if (!session || !session.results[username]) {
 			this.notifySession(session!, {
 				type: "ERROR",
 				payload:
@@ -184,12 +211,13 @@ export class CompetitionStateManager {
 	private async storeSession(
 		session: CompetitionState,
 	) {
+		const participants = session.participants.values();
 		// Store session
 		await SessionDB.upsert({
 			id: session.id,
 			type: session.type,
-			player_one: session.participants[0],
-			player_two: session.participants[1] || null,
+			player_one: participants.next().value,
+			player_two: participants.next().value,
 			winner: this.getWinner(session),
 			cube_type: session.cube_type,
 		});

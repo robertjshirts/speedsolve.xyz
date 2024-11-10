@@ -26,8 +26,8 @@ declare global {
 		type: SessionType;
 		state: SessionState;
 		cube_type: CubeType;
-		participants: string[];
-		readyParticipants?: string[];
+		participants: Set<string>;
+		readyParticipants?: Set<string>;
 		scramble: string;
 		results: Record<string, Result>;
 		start_time: number | null;
