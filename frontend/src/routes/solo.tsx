@@ -53,7 +53,7 @@ function SoloComponent() {
 
   // Initialize WebSocket connection when component mounts or auth state changes
   useEffect(() => {
-    apiInitializeConnection(`wss://api.speedsolve.xyz/competition/ws`);
+    apiInitializeConnection();
   }, [isAuthenticated, apiInitializeConnection]);
 
   // Update local state when session state changes
@@ -62,6 +62,26 @@ function SoloComponent() {
       setCurrentState(session.state);
     }
   }, [session]);
+  // Event handlers for keydown/keyup
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      if (connectionState !== 'connected') return;
+
+      if (currentState === 'scrambling') {
+        handleStartSolve();
+      } else if (currentState === 'solving') {
+        handleCompleteSolve();
+      }
+
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [currentState, connectionState]);
 
   // Handler for starting a new solve
   const handleStartSolve = () => {
@@ -75,6 +95,7 @@ function SoloComponent() {
   // Handler for completing a solve
   const handleCompleteSolve = () => {
     if (connectionState !== 'connected') return;
+    console.log('Solve completed:', time);
 
     const finalTime = time;
     stopTimer();
@@ -166,10 +187,6 @@ function SoloComponent() {
         {/* Timer component */}
         <Timer
           time={time}
-          onStart={handleStartSolve}
-          onStop={handleCompleteSolve}
-          canStart={connectionState === 'connected' && currentState === 'scrambling'}
-          currentState={currentState}
         />
 
         {/* Results modal */}

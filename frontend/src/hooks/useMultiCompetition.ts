@@ -9,22 +9,18 @@ export function useMultiCompetition(callback: (session: CompetitionState) => voi
   const apiRef = useRef<MultiCompetitionApi | null>(null);
   const { getAccessTokenSilently } = useAuth0();
 
-  const initialize = useCallback(async (wsUrl: string) => {
+  const initialize = useCallback(async () => {
     if (!apiRef.current) {
       apiRef.current = new MultiCompetitionApi({
         onConnectionStateChange: setConnectionState,
         onError: setError,
         onSessionUpdate: (session) => {
-          console.log('Session updated:', session);
           callback(session);
         }
       });
     }
 
-    await apiRef.current.initialize(
-      wsUrl,
-      getAccessTokenSilently
-    );
+    await apiRef.current.initialize(getAccessTokenSilently);
   }, [getAccessTokenSilently]);
 
   return {
@@ -36,7 +32,7 @@ export function useMultiCompetition(callback: (session: CompetitionState) => voi
     completeSolve: (time: number) => apiRef.current?.completeSolve(time),
     updatePenalty: (penalty: Penalty) => apiRef.current?.updatePenalty(penalty),
     onSessionUpdate: (updatedSession: CompetitionState) => {
-      console.log('Session updated:', updatedSession);
+      callback(updatedSession);
     }
   };
 }

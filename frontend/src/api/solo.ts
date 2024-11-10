@@ -19,17 +19,18 @@ interface WebSocketHandlers {
 export class SoloCompetitionApi {
   private ws: WebSocket | null = null;
   private handlers: WebSocketHandlers;
+  private static readonly WS_URL = import.meta.env.VITE_WS_API_URL;
 
   constructor(handlers: WebSocketHandlers) {
     this.handlers = handlers;
   }
 
-  async initialize(wsUrl: string, getAuthToken: () => Promise<string>) {
+  async initialize(getAuthToken: () => Promise<string>) {
     this.handlers.onConnectionStateChange('connecting');
 
     try {
       const token = await getAuthToken();
-      const url = new URL(wsUrl);
+      const url = new URL(SoloCompetitionApi.WS_URL);
       url.searchParams.append('token', token);
 
       this.ws = new WebSocket(url);
@@ -93,6 +94,7 @@ export class SoloCompetitionApi {
   }
 
   completeSolve(time: number) {
+    console.log('Completing solve:', time); 
     this.sendMessage({
       type: 'SOLVE_COMPLETE',
       payload: { time }

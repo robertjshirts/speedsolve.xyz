@@ -111,21 +111,12 @@ export class CompetitionStateManager {
 
 	// Solo session management
 	handleSoloStart(username: string, cube_type: CubeType) {
-		// Check if user is already in a session
-		if (this.activeSessions.has(username)) {
-			this.notifyUser(username, {
-				type: "ERROR",
-				payload: "Cannot start a new session while in an active session",
-			});
-			return;
-		}
-
 		// Check if user is in any queue
 		for (const [queueType, queue] of this.userQueues.entries()) {
 			if (queue.has(username)) {
 				this.notifyUser(username, {
 					type: "ERROR",
-					payload: `Cannot start a solo session while queued for ${queueType}`,
+					payload: `Cannot start a solo session while queued for ${queueType} multi`,
 				});
 				return;
 			}
