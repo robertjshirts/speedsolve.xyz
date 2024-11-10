@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "@/globals.css";
 import { Topbar } from "@/components/Topbar";
-import { UserProvider } from "@auth0/nextjs-auth0/client";
 import '@/globals.css';
 
 const geistSans = localFont({
@@ -29,14 +28,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-    <UserProvider>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased mx-auto flex justify-center max-w-screen-xl px-4 pt-24 h-screen`}
       >
         <Topbar />
         {children}
       </body>
-    </UserProvider>
     </html>
   );
 }

@@ -1,7 +1,19 @@
+export {}
+
 declare global {
+  type Profile = {
+    id: string
+    username: string
+    email: string
+    pfp: string
+    bio: string
+    createdAt: string
+    updatedAt: string
+  }
 	type SessionType = "solo" | "multi";
 	type SessionState = "queuing" | "scrambling" | "solving" | "complete";
 	type CubeType = "3x3" | "2x2";
+	type ConnectionState = "disconnected" | "connecting" | "connected";
 	type WebSocketMessageType =
 		| "MULTI_QUEUE"
 		| "SOLO_START"
@@ -16,20 +28,20 @@ declare global {
 		type: WebSocketMessageType;
 		payload?: any;
 	};
+	type Penalty = "DNF" | "plus2" | "none";
 	type Result = {
 		id?: string;
 		time: number;
-		penalty: "DNF" | "plus2" | "none";
-	};
+		penalty: Penalty;
+	}
 	type CompetitionState = {
 		id: string;
 		type: SessionType;
 		state: SessionState;
 		cube_type: CubeType;
 		participants: string[];
-		readyParticipants?: string[];
 		scramble: string;
 		results: Record<string, Result>;
 		start_time: number | null;
-	};
+	}
 }

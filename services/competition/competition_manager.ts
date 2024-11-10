@@ -6,19 +6,61 @@ export class CompetitionStateManager {
 	private activeSessions: Map<string, CompetitionState> = new Map();
 	private connections: Map<string, WebSocket> = new Map();
 	// Queues for multiplayer, when implemented
-	// private userQueues: Map<string, string[]> = new Map(); // cube_type -> usernames[]
+	private userQueues: Map<string, string[]> = new Map(); // cube_type -> usernames[]
 
 	addConnection(username: string, ws: WebSocket) {
 		this.connections.set(username, ws);
 		this.activeSessions.delete(username);
-		// TODO: remove user from any queues
+		this.removeFromQueue(username);
 	}
 
 	handleDisconnect(username: string) {
-		// TODO: handle multiplayer disconnect with websocket message
-		// Remove user from queues
-		this.activeSessions.delete(username);
+		const session = this.activeSessions.get(username);
+		if (session) {
+			this.notifySession(session, {
+				type: "ERROR",
+				payload: `User ${username} disconnected`,
+			});
+			this.activeSessions.delete(session.participants[0]);
+			this.activeSessions.delete(session.participants[1]);
+		}
 		this.connections.delete(username);
+		this.removeFromQueue(username);
+	}
+
+	// Handle enqueueing for multiplayer
+	handleEnqueue(username: string, cube_type: CubeType) {
+		console.log(`User ${username} enqueued for ${cube_type}`);
+		const queue = this.userQueues.get(cube_type);
+		if (!queue) {
+			this.userQueues.set(cube_type, [username]);
+		} else {
+			queue.push(username);
+			if (queue.length === 2) {
+				console.log(`Starting session for ${queue[0]} and ${queue[1]}`);
+				const session: CompetitionState = {
+					id: crypto.randomUUID(),
+					type: "multi",
+					state: "scrambling",
+					cube_type: cube_type,
+					participants: [queue[0], queue[1]],
+					readyParticipants: [],
+					scramble: generateScramble(cube_type),
+					results: {},
+					start_time: null,
+				};
+
+				// TODO: Start from here tomorrow
+
+				this.activeSessions.set(queue[0], session);
+				this.activeSessions.set(queue[1], session);
+
+				this.notifySession(session, {
+					type: "SESSION_UPDATE",
+					payload: session,
+				});
+			}
+		}
 	}
 
 	// Solo session management
@@ -35,7 +77,7 @@ export class CompetitionStateManager {
 		};
 
 		this.activeSessions.set(username, session);
-		this.notifyUser(username, {
+		this.notifySession(session, {
 			type: "SESSION_UPDATE",
 			payload: session,
 		});
@@ -45,7 +87,7 @@ export class CompetitionStateManager {
 	handleReady(username: string) {
 		const session = this.activeSessions.get(username);
 		if (!session || session.state !== "scrambling") {
-			this.notifyUser(username, {
+			this.notifySession(session!, {
 				type: "ERROR",
 				payload:
 					`Invalid state, user ${username} is not in a valid state to start solving`,
@@ -56,7 +98,7 @@ export class CompetitionStateManager {
 		if (session.type === "solo") {
 			session.state = "solving";
 			session.start_time = Date.now();
-			this.notifyUser(username, {
+			this.notifySession(session, {
 				type: "SESSION_UPDATE",
 				payload: session,
 			});
@@ -68,7 +110,7 @@ export class CompetitionStateManager {
 	async handleSolveComplete(username: string, result: Result) {
 		const session = this.activeSessions.get(username);
 		if (!session || !session.start_time) {
-			this.notifyUser(username, {
+			this.notifySession(session!, {
 				type: "ERROR",
 				payload:
 					`Invalid state, user ${username} is not in a valid state to complete a solve`,
@@ -91,7 +133,7 @@ export class CompetitionStateManager {
 			session.results[username] = result;
 			session.state = "complete";
 			await this.storeSession(session);
-			this.notifyUser(username, {
+			this.notifySession(session, {
 				type: "SESSION_UPDATE",
 				payload: session,
 			});
@@ -104,7 +146,7 @@ export class CompetitionStateManager {
 	) {
 		const session = this.activeSessions.get(username);
 		if (!session || session.state !== "complete") {
-			this.notifyUser(username, {
+			this.notifySession(session!, {
 				type: "ERROR",
 				payload:
 					`User ${username} is not in a session to apply a penalty`,
@@ -114,17 +156,28 @@ export class CompetitionStateManager {
 
 		session.results[username].penalty = penalty;
 		await this.storeSession(session);
-		this.notifyUser(username, {
+		this.notifySession(session!, {
 			type: "SESSION_UPDATE",
 			payload: session,
 		});
 	}
 
-	private notifyUser(username: string, payload: WebSocketMessage) {
-		console.log(`to ${username}: ${payload}`);
-		const ws = this.connections.get(username);
-		if (ws) {
-			ws.send(JSON.stringify(payload));
+	private removeFromQueue(username: string) {
+		for (const queue of this.userQueues.values()) {
+			const index = queue.indexOf(username);
+			if (index !== -1) {
+				queue.splice(index, 1);
+			}
+		}
+	}
+
+	private notifySession(session: CompetitionState, payload: WebSocketMessage) {
+		for (const username of session.participants) {
+			console.log(`to ${username}: ${payload}`);
+			const ws = this.connections.get(username);
+			if (ws) {
+				ws.send(JSON.stringify(payload));
+			}
 		}
 	}
 

@@ -2,6 +2,7 @@ import { STATUS_CODE } from "status";
 import { Router, type RouterContext } from "oak";
 import { generateScramble } from "./scrambler.ts";
 import { verifyAndParseJWT } from "./auth.ts";
+import { computeUserAverage } from "./average.ts";
 import { CompetitionStateManager } from "./competition_manager.ts";
 
 const router = new Router();
@@ -12,6 +13,20 @@ router.get(
 	(ctx: RouterContext<"/competition/health">) => {
 		console.log("health endpoint reached");
 		ctx.response.status = STATUS_CODE.OK;
+		return;
+	},
+);
+
+router.get(
+	"/competition/stats/:username",
+	async (ctx: RouterContext<"/competition/stats/:username">) => {
+		const username = ctx.params.username;
+		const stats = await computeUserAverage(username);
+		console.log("stats in handler", stats);
+		ctx.response.status = STATUS_CODE.OK;
+		ctx.response.body = {
+			average_time: stats,
+		};
 		return;
 	},
 );
