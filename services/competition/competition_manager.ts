@@ -272,7 +272,17 @@ export class CompetitionStateManager {
 	private notifyUser(username: string, payload: WebSocketMessage) {
 		const ws = this.connections.get(username);
 		if (ws && ws.readyState === 1) { // Check if WebSocket is OPEN (readyState === 1)
-			ws.send(JSON.stringify(payload));
+			// Convert Sets to arrays before sending
+			if (payload.type === "SESSION_UPDATE") {
+				const sessionPayload = { ...payload.payload };
+				sessionPayload.participants = Array.from(sessionPayload.participants);
+				if (sessionPayload.type === "multi" && sessionPayload.readyParticipants) {
+					sessionPayload.readyParticipants = Array.from(sessionPayload.readyParticipants);
+				}
+				ws.send(JSON.stringify({ ...payload, payload: sessionPayload }));
+			} else {
+				ws.send(JSON.stringify(payload));
+			}
 		}
 	}
 
