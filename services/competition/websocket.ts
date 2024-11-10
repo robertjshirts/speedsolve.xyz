@@ -54,6 +54,14 @@ router.get(
 			stateManager.handleDisconnect(username);
 		};
 
+		ws.onerror = (event) => {
+			console.error(
+				`websocket error for ${username}:`,
+				event,
+			);
+			stateManager.handleDisconnect(username);
+		};
+
 		ws.onmessage = async (event) => {
 			try {
 				const message: WebSocketMessage = JSON.parse(event.data);
