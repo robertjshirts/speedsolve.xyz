@@ -35,7 +35,7 @@ export class CompetitionStateManager {
 		const queue = this.userQueues.get(cube_type);
 		if (!queue) {
 			this.userQueues.set(cube_type, new Set([username]));
-			this.notifySession(session, {
+			this.notifyUser(username, {
 				type: "QUEUE_CONFIRMED",
 			});
 		} else {
@@ -206,11 +206,14 @@ export class CompetitionStateManager {
 
 	private notifySession(session: CompetitionState, payload: WebSocketMessage) {
 		for (const username of session.participants) {
-			console.log(`to ${username}: ${payload}`);
-			const ws = this.connections.get(username);
-			if (ws) {
-				ws.send(JSON.stringify(payload));
-			}
+			this.notifyUser(username, payload);
+		}
+	}
+
+	private notifyUser(username: string, payload: WebSocketMessage) {
+		const ws = this.connections.get(username);
+		if (ws) {
+			ws.send(JSON.stringify(payload));
 		}
 	}
 

@@ -16,6 +16,7 @@ declare global {
 	type ConnectionState = "disconnected" | "connecting" | "connected";
 	type WebSocketMessageType =
 		| "MULTI_QUEUE"
+		| "QUEUE_CONFIRM"
 		| "SOLO_START"
 		| "READY"
 		| "SOLVE_COMPLETE"

@@ -24,7 +24,6 @@ function SoloComponent() {
   const [session, setSession] = useState<CompetitionState | null>(null);
   const [currentState, setCurrentState] = useState<SessionState>('scrambling');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const checkIntervalRef = useRef<number | null>(null);
   const { getAccessTokenSilently } = useAuth0();
   
   const { 
@@ -35,20 +34,10 @@ function SoloComponent() {
     completeSolve: apiCompleteSolve,
     startSession: apiStartSession,
     updatePenalty: apiUpdatePenalty
-  } = useSoloCompetition((session) => {
-    setSession(session);
-  });
+  } = useSoloCompetition((session) => setSession(session));
 
   useEffect(() => {
-    async function initializeWebSocket() {
-      const token = await getAccessTokenSilently();
-
-      if (isAuthenticated) {
-        initialize(`wss://api.speedsolve.xyz/competition/ws`);
-      }
-    }
-
-    initializeWebSocket();
+    initialize(`wss://api.speedsolve.xyz/competition/ws`);
   }, [isAuthenticated, initialize]);
 
   useEffect(() => {
