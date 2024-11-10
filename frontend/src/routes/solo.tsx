@@ -44,7 +44,7 @@ function SoloComponent() {
       const token = await getAccessTokenSilently();
 
       if (isAuthenticated) {
-        initialize(`wss://api.speedsolve.xyz/competition/ws?token=${token}`);
+        initialize(`wss://api.speedsolve.xyz/competition/ws`);
       }
     }
 

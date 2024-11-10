@@ -35,6 +35,9 @@ export class CompetitionStateManager {
 		const queue = this.userQueues.get(cube_type);
 		if (!queue) {
 			this.userQueues.set(cube_type, new Set([username]));
+			this.notifySession(session, {
+				type: "QUEUE_CONFIRMED",
+			});
 		} else {
 			if (queue.has(username)) {
 				return;
@@ -195,9 +198,8 @@ export class CompetitionStateManager {
 
 	private removeFromQueue(username: string) {
 		for (const queue of this.userQueues.values()) {
-			const index = queue.indexOf(username);
-			if (index !== -1) {
-				queue.splice(index, 1);
+			if (queue.has(username)) {
+				queue.delete(username);
 			}
 		}
 	}

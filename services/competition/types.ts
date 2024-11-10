@@ -4,6 +4,7 @@ declare global {
 	type CubeType = "3x3" | "2x2";
 	type WebSocketMessageType =
 		| "MULTI_QUEUE"
+		| "QUEUE_CONFIRMED"
 		| "SOLO_START"
 		| "READY"
 		| "SOLVE_COMPLETE"
