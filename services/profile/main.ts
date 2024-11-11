@@ -10,6 +10,7 @@ const ALLOWED_ORIGINS = [
 	"http://localhost:3000",
 	"http://localhost:3001",
 	"https://speedsolve.xyz",
+	"https://react.speedsolve.xyz",
 ];
 app.use(async (ctx, next) => {
 	const origin = ctx.request.headers.get("origin");

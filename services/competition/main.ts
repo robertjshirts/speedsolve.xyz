@@ -5,7 +5,7 @@ import router from "./websocket.ts";
 
 const app = new Application();
 
-const ALLOWED_ORIGINS = ["http://localhost:3000", "https://speedsolve.xyz"];
+const ALLOWED_ORIGINS = ["http://localhost:3000", "https://speedsolve.xyz", "https://react.speedsolve.xyz"];
 app.use(async (ctx, next) => {
 	const origin = ctx.request.headers.get("origin");
 	if (origin && ALLOWED_ORIGINS.includes(origin)) {

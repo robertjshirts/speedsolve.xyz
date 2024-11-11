@@ -255,6 +255,8 @@ export class CompetitionStateManager {
 	}
 
 	private notifySession(session: CompetitionState, payload: WebSocketMessage) {
+		if (session.participants.size === 0) return;
+
 		for (const username of session.participants) {
 			this.notifyUser(username, payload);
 		}
