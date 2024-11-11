@@ -1,4 +1,4 @@
-import * as React from 'react'
+import { useState, useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMultiCompetition } from '../hooks/useMultiCompetition'
 import { CompetitionState } from '../api/multi'
@@ -6,13 +6,18 @@ import { Scramble } from '../components/Scramble'
 import { Timer } from '../components/Timer'
 import { CubePreview3d } from '../components/CubePreview3d'
 import { useCubeTimer } from '../hooks/useCubeTimer'
+import { OpponentCard } from '../components/OpponentCard'
+import { useAuth0 } from '@auth0/auth0-react'
+import { getProfile } from '../api/profile'
 
 export const Route = createFileRoute('/multi')({
   component: RouteComponent,
 })
 
 function RouteComponent() {
-  const [session, setSession] = React.useState<CompetitionState | null>(null)
+  const { isLoading, isAuthenticated, loginWithRedirect, user } = useAuth0();
+  const [session, setSession] = useState<CompetitionState | null>(null)
+  const [opponent, setOpponent] = useState<Profile | null>(null)
   const { time, startTimer, stopTimer, resetTimer } = useCubeTimer()
   const { 
     connectionState, 
@@ -22,50 +27,46 @@ function RouteComponent() {
     startSolve 
   } = useMultiCompetition((updatedSession) => setSession(updatedSession))
 
-  React.useEffect(() => {
+  useEffect(() => {
     apiInitializeConnection()
   }, [apiInitializeConnection])
 
-  React.useEffect(() => {
-    if (session && session.state === 'solving') {
+  // Effects on session state
+  useEffect(() => {
+    if (!session) return;
+    if (session.state === 'scrambling') {
+      const opponent = session.participants.find(p => {
+        return p !== user?.username;
+      })
+      getProfile(opponent!).then(setOpponent)
+    }
+    if (session.state === 'solving') {
       startTimer();
+    }
+
+    if (error) {
+
     }
   }, [session]);
 
   const renderReadyStatus = () => {
-    if (!session || !session.participants || session.participants.length < 2) {
-      return null;
-    }
-
-    const currentUser = session.participants.find(p => p.is_self);
-    const otherUser = session.participants.find(p => !p.is_self);
-
-    if (!currentUser || !otherUser) return null;
-
-    if (currentUser.ready && otherUser.ready) {
-      return <p className="text-green-500">Both participants are ready!</p>;
-    } else if (currentUser.ready) {
-      return <p className="text-yellow-500">Waiting for other participant...</p>;
-    } else if (otherUser.ready) {
-      return <p className="text-yellow-500">Other participant is waiting for you...</p>;
-    }
-
-    return null;
+    return (
+      <> </>
+    )
   }
 
   const renderOpponentBox = () => {
-    if (!session?.participants) return null;
-    const opponent = session.participants.find(p => !p.is_self);
     if (!opponent) return null;
 
     return (
-      <div className="w-64 h-64 bg-skin-fill rounded-lg p-4 shadow-lg">
-        <h3 className="text-lg font-semibold mb-2">Opponent</h3>
-        <div className="text-center">
-          <p className="text-xl">Opponent #{opponent.id}</p>
-          {opponent.ready && <p className="text-green-500">Ready</p>}
-        </div>
-      </div>
+      <OpponentCard opponent={opponent} />
+    );
+  }
+
+  const renderCubePreview = () => {
+    if (!session || !session.scramble) return null;
+    return (
+      <CubePreview3d scramble={session.scramble} />
     );
   }
 
@@ -96,29 +97,22 @@ function RouteComponent() {
     }
 
     // Show scrambling state UI
-    if (session.state === 'scrambling' || session.state === 'solving') {
+    else {
       return (
         <div className="flex flex-col items-center">
           <Scramble scramble={session.scramble} />
-          <div className="flex gap-8 my-8">
-            <CubePreview3d scramble={session.scramble} />
-            {renderOpponentBox()}
-          </div>
+          {renderCubePreview()}
+          {renderOpponentBox()}
           <Timer
-            time={0}
-            onStart={() => {} }
-            onStop={() => {} }
-            canStart={false}
-            currentState={session.state}
+            time={time}
           />
           <button
             onClick={startSolve}
-            disabled={session.participants.find(p => p.is_self)?.ready}
+            disabled={session.readyParticipants?.includes(user?.username!)}
             className="mt-4 bg-green-500 text-white px-6 py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
           >
-            Ready
+            Ready to solve
           </button>
-          {renderReadyStatus()}
         </div>
       );
     }

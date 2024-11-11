@@ -37,7 +37,6 @@ declare global {
   }
   type Participant = {
     id: string;
-    ready: boolean;
     is_self: boolean;
   }
   type CompetitionState = {
@@ -45,7 +44,8 @@ declare global {
     type: SessionType;
     state: SessionState;
     cube_type: CubeType;
-    participants: Participant[];
+    participants: string[];
+    readyParticipants?: string[];
     scramble: string;
     results: Record<string, Result>;
     start_time: number | null;

@@ -25,7 +25,7 @@ export const Route = createFileRoute('/solo')({
 
 function SoloComponent() {
   // Auth0 authentication hooks
-  const { isLoading, isAuthenticated, loginWithRedirect, getAccessTokenSilently } = useAuth0();
+  const { isLoading, isAuthenticated, loginWithRedirect } = useAuth0();
 
   // Timer state management from custom hook
   const { 
@@ -37,7 +37,7 @@ function SoloComponent() {
 
   // Local state management
   const [session, setSession] = useState<CompetitionState | null>(null);        // Current solving session state
-  const [currentState, setCurrentState] = useState<SessionState>('scrambling'); // Current solve state (scrambling/solving)
+  const [currentState, setCurrentState] = useState<SessionState>('scrambling'); // Current solve state
   const [isModalOpen, setIsModalOpen] = useState(false);                        // Controls result modal visibility
 
   // Competition management hook with session update callback
