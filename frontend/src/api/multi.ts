@@ -19,7 +19,7 @@ interface WebSocketHandlers {
 export class MultiCompetitionApi {
   private ws: WebSocket | null = null;
   private handlers: WebSocketHandlers;
-  private static readonly WS_URL = import.meta.env.VITE_WS_API_URL;
+  private static readonly WS_URL = `${import.meta.env.VITE_WS_PROTOCOL}://${import.meta.env.VITE_API_URL}/multi`;
 
   constructor(handlers: WebSocketHandlers) {
     this.handlers = handlers;

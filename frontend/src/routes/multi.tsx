@@ -9,6 +9,7 @@ import { useCubeTimer } from '../hooks/useCubeTimer'
 import { OpponentCard } from '../components/OpponentCard'
 import { useAuth0 } from '@auth0/auth0-react'
 import { getProfile } from '../api/profile'
+import { MultiResult } from '../components/MultiResult'
 
 export const Route = createFileRoute('/multi')({
   component: RouteComponent,
@@ -18,13 +19,15 @@ function RouteComponent() {
   const { isLoading, isAuthenticated, loginWithRedirect, user } = useAuth0();
   const [session, setSession] = useState<CompetitionState | null>(null)
   const [opponent, setOpponent] = useState<Profile | null>(null)
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const { time, startTimer, stopTimer, resetTimer } = useCubeTimer()
   const { 
     connectionState, 
     error, 
     initialize: apiInitializeConnection, 
-    startQueue,
-    startSolve 
+    startQueue: apiStartQueue,
+    startSolve: apiStartSolve,
+    completeSolve: apiCompleteSolve
   } = useMultiCompetition((updatedSession) => setSession(updatedSession))
 
   useEffect(() => {
@@ -40,14 +43,38 @@ function RouteComponent() {
       })
       getProfile(opponent!).then(setOpponent)
     }
-    if (session.state === 'solving') {
+    if (session.state === 'solving' && Object.keys(session.results).length === 0) {
       startTimer();
     }
 
-    if (error) {
-
-    }
   }, [session]);
+
+  // Keyboard event handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      if (connectionState !== 'connected') return;
+      if (session?.state === 'scrambling' && Object.keys(session.results).length === 0) {
+        apiStartSolve();
+      }
+      if (session?.state === 'solving') {
+        const finalTime = time;
+        stopTimer();
+        setIsModalOpen(true);
+        apiCompleteSolve(finalTime);
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [session?.state, connectionState])
+
+  // Modal handlers
+  const handleNewSession = () => {
+    if (Object.keys(session!.results).length === 2) {
+      setIsModalOpen(false);
+      handleNewSession();
+    }
+  }
 
   const renderReadyStatus = () => {
     return (
@@ -76,7 +103,7 @@ function RouteComponent() {
       return (
         <div className="flex flex-col items-center justify-center h-[60vh]">
           <button 
-            onClick={startQueue}
+            onClick={apiStartQueue}
             disabled={connectionState !== 'connected'}
             className="bg-skin-accent text-skin-base px-6 py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
           >
@@ -97,7 +124,7 @@ function RouteComponent() {
     }
 
     // Show scrambling state UI
-    else {
+    else if (session.state === 'scrambling') {
       return (
         <div className="flex flex-col items-center">
           <Scramble scramble={session.scramble} />
@@ -107,7 +134,7 @@ function RouteComponent() {
             time={time}
           />
           <button
-            onClick={startSolve}
+            onClick={apiStartSolve}
             disabled={session.readyParticipants?.includes(user?.username!)}
             className="mt-4 bg-green-500 text-white px-6 py-3 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50"
           >
@@ -115,6 +142,25 @@ function RouteComponent() {
           </button>
         </div>
       );
+    }
+
+    // Show solving state UI
+    else {
+      return (
+        <div className="flex flex-col items-center">
+          {renderOpponentBox()}
+          <Timer
+            time={time}
+          />
+          <MultiResult
+            isOpen={isModalOpen}
+            onClose={handleNewSession}
+            session={session}
+            time={time}
+            onPenaltyChange={() => {} }
+      />
+        </div>
+      )
     }
   }
 
