@@ -6,7 +6,7 @@ export const ProfilePostBody = z.object({
 	id: z.string().length(30),
 	username: z.string().min(3).max(15),
 	email: z.string().email(),
-	bio: z.string().optional(),
+	bio: z.string().max(1000).optional(),
 	pfp: z.string().url().optional(),
 });
 
