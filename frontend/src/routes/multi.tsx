@@ -27,7 +27,8 @@ function RouteComponent() {
     initialize: apiInitializeConnection, 
     startQueue: apiStartQueue,
     startSolve: apiStartSolve,
-    completeSolve: apiCompleteSolve
+    completeSolve: apiCompleteSolve,
+    updatePenalty: apiUpdatePenalty
   } = useMultiCompetition((updatedSession) => setSession(updatedSession))
 
   useEffect(() => {
@@ -58,22 +59,26 @@ function RouteComponent() {
         apiStartSolve();
       }
       if (session?.state === 'solving') {
-        const finalTime = time;
         stopTimer();
+        const finalTime = time;
         setIsModalOpen(true);
         apiCompleteSolve(finalTime);
       }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [session?.state, connectionState])
+  }, [session?.state, connectionState, time])
 
   // Modal handlers
   const handleNewSession = () => {
-    if (Object.keys(session!.results).length === 2) {
-      setIsModalOpen(false);
-      handleNewSession();
-    }
+    setIsModalOpen(false);
+    setSession(null);
+    resetTimer();
+    apiStartQueue();
+  }
+
+  const handlePenaltyChange = (penalty: Penalty) => {
+    apiUpdatePenalty(penalty);
   }
 
   const renderReadyStatus = () => {
@@ -157,8 +162,8 @@ function RouteComponent() {
             onClose={handleNewSession}
             session={session}
             time={time}
-            onPenaltyChange={() => {} }
-      />
+            onPenaltyChange={handlePenaltyChange}
+          />
         </div>
       )
     }

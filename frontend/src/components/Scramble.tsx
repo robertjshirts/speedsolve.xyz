@@ -7,8 +7,8 @@ interface ScrambleProps {
 
 export function Scramble({ scramble }: ScrambleProps) {
   return (
-    <div className="w-full p-2 rounded shadow-sm bg-gray-800">
-      <p className="text-center text-gray-800 dark:text-white font-mono text-4xl">
+    <div className="w-full px-4 py-2 rounded shadow-sm bg-skin-off border border-skin-accent">
+      <p className="text-center text-skin-base font-mono text-4xl">
         {scramble}
       </p>
     </div>

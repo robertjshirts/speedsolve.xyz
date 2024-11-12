@@ -154,50 +154,50 @@ function SoloComponent() {
 
   // Main component render
   return (
-    <div className="flex flex-row">
-      <div className="grow flex flex-col items-center">
-        {/* Connection status banner */}
-        {connectionState !== 'connected' && (
-          <div
-            className={`w-full p-2 text-center text-skin-base ${
-              connectionState === 'connecting' 
-                ? 'bg-skin-accent bg-opacity-50' 
-                : 'bg-skin-accent'
-            }`}
-          >
-            {connectionState === 'connecting' ? 'Connecting...' : 'Disconnected'}
-          </div>
-        )}
-        
-        {/* Error message display */}
-        {error && (
-          <div className="w-full p-2 bg-skin-accent text-skin-base text-center">
-            {error}
-          </div>
-        )}
+    <div className="flex flex-col">
+      {/* Connection status banner */}
+      {connectionState !== 'connected' && (
+        <div
+          className={`w-full p-2 text-center text-skin-base ${
+            connectionState === 'connecting' 
+              ? 'bg-skin-accent bg-opacity-50' 
+              : 'bg-skin-accent'
+          }`}
+        >
+          {connectionState === 'connecting' ? 'Connecting...' : 'Disconnected'}
+        </div>
+      )}
+      
+      {/* Error message display */}
+      {error && (
+        <div className="w-full p-2 bg-skin-accent text-skin-base text-center">
+          {error}
+        </div>
+      )}
 
+      <div className="flex flex-col items-center justify-between">
         {/* Scramble display */}
         <Scramble scramble={session.scramble} />
-        
+        <div className="w-full h-12"></div>
+        {/* Timer component */}
+        <Timer time={time} />
+
         {/* 3D cube preview (only shown during scrambling) */}
         {currentState === 'scrambling' && (
-          <CubePreview3d scramble={session.scramble} />
+          <div className="w-full max-w-xs">
+            <CubePreview3d scramble={session.scramble} />
+          </div>
         )}
-
-        {/* Timer component */}
-        <Timer
-          time={time}
-        />
-
-        {/* Results modal */}
-        <SoloResult
-          isOpen={isModalOpen}
-          onClose={handleNewSession}
-          session={session}
-          time={time}
-          onPenaltyChange={handlePenaltyChange}
-        />
       </div>
+
+      {/* Results modal */}
+      <SoloResult
+        isOpen={isModalOpen}
+        onClose={handleNewSession}
+        session={session}
+        time={time}
+        onPenaltyChange={handlePenaltyChange}
+      />
     </div>
   );
 }
