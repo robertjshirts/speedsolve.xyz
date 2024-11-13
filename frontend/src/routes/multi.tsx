@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
 import { useMultiCompetition } from '../hooks/useMultiCompetition'
-import { CompetitionState } from '../api/multi'
 import { Scramble } from '../components/Scramble'
 import { Timer } from '../components/Timer'
 import { CubePreview3d } from '../components/CubePreview3d'
@@ -10,6 +9,7 @@ import { OpponentCard } from '../components/OpponentCard'
 import { useAuth0 } from '@auth0/auth0-react'
 import { getProfile } from '../api/profile'
 import { MultiResult } from '../components/MultiResult'
+import { Login } from '../components/Login'
 
 export const Route = createFileRoute('/multi')({
   component: RouteComponent,
@@ -28,7 +28,8 @@ function RouteComponent() {
     startQueue: apiStartQueue,
     startSolve: apiStartSolve,
     completeSolve: apiCompleteSolve,
-    updatePenalty: apiUpdatePenalty
+    updatePenalty: apiUpdatePenalty,
+    leaveSession: apiLeaveSession
   } = useMultiCompetition((updatedSession) => setSession(updatedSession))
 
   useEffect(() => {
@@ -42,7 +43,10 @@ function RouteComponent() {
       const opponent = session.participants.find(p => {
         return p !== user?.username;
       })
-      getProfile(opponent!).then(setOpponent)
+      getProfile(opponent!).then((opponentProfile) => {
+        console.log("opponent:", opponentProfile);
+        setOpponent(opponentProfile);
+      })
     }
     if (session.state === 'solving' && Object.keys(session.results).length === 0) {
       startTimer();
@@ -70,11 +74,11 @@ function RouteComponent() {
   }, [session?.state, connectionState, time])
 
   // Modal handlers
-  const handleNewSession = () => {
+  const handleCloseModal = () => {
     setIsModalOpen(false);
-    setSession(null);
     resetTimer();
-    apiStartQueue();
+    apiLeaveSession();
+    setSession(null);
   }
 
   const handlePenaltyChange = (penalty: Penalty) => {
@@ -103,8 +107,22 @@ function RouteComponent() {
   }
 
   const renderContent = () => {
-    // Initial state - just show the start queue button
-    if (!session) {
+    // Show login screen if not authenticated
+    if (!isAuthenticated) {
+      return (
+        <Login />
+      );
+    }
+    // Show error if there is one
+    else if (error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[60vh]">
+          <p className="text-xl text-skin-base">Error: {error}</p>
+        </div>
+      );
+    }
+    // Show start queue button if there is no session
+    else if (!session) {
       return (
         <div className="flex flex-col items-center justify-center h-[60vh]">
           <button 
@@ -159,7 +177,7 @@ function RouteComponent() {
           />
           <MultiResult
             isOpen={isModalOpen}
-            onClose={handleNewSession}
+            onClose={handleCloseModal}
             session={session}
             time={time}
             onPenaltyChange={handlePenaltyChange}
@@ -170,9 +188,7 @@ function RouteComponent() {
   }
 
   return (
-    <div className="flex flex-col items-center p-4">
-      <h1 className="text-2xl mb-4">Multi Competition</h1>
-      {error && <p className="text-skin-accent mb-4">Error: {error}</p>}
+    <div className="flex flex-col items-center">
       {renderContent()}
     </div>
   )

@@ -2,26 +2,30 @@ declare global {
 	type SessionType = "solo" | "multi";
 	type SessionState = "queuing" | "scrambling" | "solving" | "complete";
 	type CubeType = "3x3" | "2x2";
-	type WebSocketMessageType =
-		| "MULTI_QUEUE"
-		| "QUEUE_CONFIRMED"
-		| "SOLO_START"
-		| "READY"
-		| "SOLVE_COMPLETE"
-		| "PENALTY"
-		| "REMATCH"
-		| "LEAVE"
-		| "SESSION_UPDATE"
-		| "ERROR";
-	type WebSocketMessage = {
-		type: WebSocketMessageType;
+
+	// Common message types
+	type CommonMessageType = "ERROR" | "SESSION_UPDATE";
+
+	// Solo-specific message types
+	type SoloMessageType = CommonMessageType | "SOLO_START" | "READY" | "SOLVE_COMPLETE" | "PENALTY";
+	type SoloWebSocketMessage = {
+		type: SoloMessageType;
 		payload?: any;
 	};
+
+	// Multi-specific message types
+	type MultiMessageType = CommonMessageType | "QUEUE" | "READY" | "SOLVE_COMPLETE" | "PENALTY" | "LEAVE";
+	type MultiWebSocketMessage = {
+		type: MultiMessageType;
+		payload?: any;
+	};
+
 	type Result = {
 		id?: string;
 		time: number;
 		penalty: "DNF" | "plus2" | "none";
 	};
+
 	type CompetitionState = {
 		id: string;
 		type: SessionType;

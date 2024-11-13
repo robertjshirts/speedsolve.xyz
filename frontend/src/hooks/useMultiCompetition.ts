@@ -31,6 +31,7 @@ export function useMultiCompetition(callback: (session: CompetitionState) => voi
     startSolve: () => apiRef.current?.startSolve(),
     completeSolve: (time: number) => apiRef.current?.completeSolve(time),
     updatePenalty: (penalty: Penalty) => apiRef.current?.updatePenalty(penalty),
+    leaveSession: () => apiRef.current?.leaveSession(),
     onSessionUpdate: (updatedSession: CompetitionState) => {
       callback(updatedSession);
     }

@@ -1,15 +1,3 @@
-export type {
-  SessionType,
-  SessionState,
-  CubeType,
-  ConnectionState,
-  WebSocketMessageType,
-  WebSocketMessage,
-  Penalty,
-  Result,
-  CompetitionState,
-};
-
 interface WebSocketHandlers {
   onConnectionStateChange: (state: ConnectionState) => void;
   onError: (error: string) => void;
@@ -19,7 +7,7 @@ interface WebSocketHandlers {
 export class MultiCompetitionApi {
   private ws: WebSocket | null = null;
   private handlers: WebSocketHandlers;
-  private static readonly WS_URL = `${import.meta.env.VITE_WS_PROTOCOL}://${import.meta.env.VITE_API_URL}/competition/ws`;
+  private static readonly WS_URL = `${import.meta.env.VITE_WS_PROTOCOL}://${import.meta.env.VITE_API_URL}/competition/ws/multi`;
 
   constructor(handlers: WebSocketHandlers) {
     this.handlers = handlers;
@@ -50,17 +38,18 @@ export class MultiCompetitionApi {
       };
       
       this.ws.onmessage = (event) => {
-        const message = JSON.parse(event.data) as WebSocketMessage;
+        const message = JSON.parse(event.data) as MultiWebSocketMessage;
         console.log('Received message:', message);
         this.handleWebSocketMessage(message);
       };
     } catch (error) {
+      console.error('Failed to connect:', error);
       this.handlers.onError('Failed to connect');
       this.handlers.onConnectionStateChange('disconnected');
     }
   }
 
-  private handleWebSocketMessage(message: WebSocketMessage) {
+  private handleWebSocketMessage(message: MultiWebSocketMessage) {
     switch (message.type) {
       case 'SESSION_UPDATE':
         this.handlers.onSessionUpdate(message.payload);
@@ -71,7 +60,7 @@ export class MultiCompetitionApi {
     }
   }
 
-  private sendMessage(message: WebSocketMessage) {
+  private sendMessage(message: MultiWebSocketMessage) {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     } else {
@@ -81,7 +70,7 @@ export class MultiCompetitionApi {
 
   startQueue() {
     this.sendMessage({
-      type: 'MULTI_QUEUE',
+      type: 'QUEUE',
       payload: { cube_type: "3x3" }
     });
   }
@@ -104,6 +93,12 @@ export class MultiCompetitionApi {
     this.sendMessage({
       type: 'PENALTY',
       payload: { penalty }
+    });
+  }
+
+  leaveSession() {
+    this.sendMessage({
+      type: 'LEAVE'
     });
   }
 

@@ -1,9 +1,9 @@
-import { Next, RouterContext } from "oak";
+import { Next, Context } from "oak";
 import * as jose from "jose";
 import { STATUS_CODE } from "status";
 
 export async function verifyAndParseJWT(
-	ctx: RouterContext<"/competition/ws">,
+	ctx: Context,
 	next: Next,
 ) {
 	const token = ctx.request.url.searchParams.get("token");

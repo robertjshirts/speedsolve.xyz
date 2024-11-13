@@ -1,15 +1,3 @@
-export type {
-  SessionType,
-  SessionState,
-  CubeType,
-  ConnectionState,
-  WebSocketMessageType,
-  WebSocketMessage,
-  Penalty,
-  Result,
-  CompetitionState,
-};
-
 interface WebSocketHandlers {
   onConnectionStateChange: (state: ConnectionState) => void;
   onError: (error: string) => void;
@@ -19,7 +7,7 @@ interface WebSocketHandlers {
 export class SoloCompetitionApi {
   private ws: WebSocket | null = null;
   private handlers: WebSocketHandlers;
-  private static readonly WS_URL = `${import.meta.env.VITE_WS_PROTOCOL}://${import.meta.env.VITE_API_URL}/competition/ws`;
+  private static readonly WS_URL = `${import.meta.env.VITE_WS_PROTOCOL}://${import.meta.env.VITE_API_URL}/competition/ws/solo`;
 
   constructor(handlers: WebSocketHandlers) {
     this.handlers = handlers;
@@ -51,7 +39,7 @@ export class SoloCompetitionApi {
       };
       
       this.ws.onmessage = (event) => {
-        const message = JSON.parse(event.data) as WebSocketMessage;
+        const message = JSON.parse(event.data) as SoloWebSocketMessage;
         console.log('Received message:', message);
         this.handleWebSocketMessage(message);
       };
@@ -61,7 +49,7 @@ export class SoloCompetitionApi {
     }
   }
 
-  private handleWebSocketMessage(message: WebSocketMessage) {
+  private handleWebSocketMessage(message: SoloWebSocketMessage) {
     switch (message.type) {
       case 'SESSION_UPDATE':
         this.handlers.onSessionUpdate(message.payload);
@@ -72,7 +60,7 @@ export class SoloCompetitionApi {
     }
   }
 
-  private sendMessage(message: WebSocketMessage) {
+  private sendMessage(message: SoloWebSocketMessage) {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(message));
     } else {

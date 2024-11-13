@@ -1,6 +1,5 @@
 import { Modal } from './Modal'
 import { useTimeFormat } from '../hooks/useTimeFormat'
-import type { CompetitionState } from '../api/multi'
 import { useAuth0 } from '@auth0/auth0-react'
 
 interface MultiResultProps {
@@ -15,7 +14,7 @@ export function MultiResult({ isOpen, onClose, session, time, onPenaltyChange }:
   const { formatTime } = useTimeFormat()
   const { user } = useAuth0()
 
-  const getFormattedTime = (time: number, penalty: Penalty) => {
+  const getFormattedTime = (time: number, penalty: Penalty): string => {
     const baseTime = formatTime(time)
     switch (penalty) {
       case 'plus2':
@@ -27,10 +26,10 @@ export function MultiResult({ isOpen, onClose, session, time, onPenaltyChange }:
     }
   }
 
-  const determineWinner = () => {
+  const determineWinner = (): string | null => {
     if (!session.results || Object.keys(session.results).length < 2) return null
 
-    const results = Object.entries(session.results)
+    const results = Object.entries(session.results) as [string, Result][]
     const [player1, player2] = results
 
     // If either player has DNF, they lose
@@ -55,7 +54,7 @@ export function MultiResult({ isOpen, onClose, session, time, onPenaltyChange }:
         
         {/* Results Display */}
         <div className="space-y-4">
-          {session.results && Object.entries(session.results).map(([username, result]) => {
+          {session.results && Object.entries(session.results).map(([username, result]: [string, Result]) => {
             const isSelf = username === user?.username
             const isWinner = winner === username
 
@@ -90,14 +89,16 @@ export function MultiResult({ isOpen, onClose, session, time, onPenaltyChange }:
 
         {/* Penalty Controls (only for self) */}
         {session.results && user?.username && session.results[user.username] && (
-          <div className="flex justify-center space-x-4 mt-6">
-            <button
-              onClick={() => onPenaltyChange('none')}
-              className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-            >
-              OK
-            </button>
-            <button
+          <div className="flex flex-col items-center">
+            <span className="text-lg font-medium text-skin-base">Adjust your penalty</span>
+            <div className="flex justify-center space-x-4 mt-6">
+              <button
+                onClick={() => onPenaltyChange('none')}
+                className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+              >
+                N/A
+              </button>
+              <button
               onClick={() => onPenaltyChange('plus2')}
               className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600"
             >
@@ -105,10 +106,11 @@ export function MultiResult({ isOpen, onClose, session, time, onPenaltyChange }:
             </button>
             <button
               onClick={() => onPenaltyChange('DNF')}
-              className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-            >
-              DNF
-            </button>
+                className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+              >
+                DNF
+              </button>
+            </div>
           </div>
         )}
       </div>
