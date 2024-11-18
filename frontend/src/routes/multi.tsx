@@ -39,6 +39,9 @@ function RouteComponent() {
   // Effects on session state
   useEffect(() => {
     if (!session) return;
+    if (session.state === 'webrtc') {
+      
+    }
     if (session.state === 'scrambling') {
       const opponent = session.participants.find(p => {
         return p !== user?.username;

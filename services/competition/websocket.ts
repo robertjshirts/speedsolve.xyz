@@ -35,7 +35,7 @@ router.get(
 // Solo websocket endpoint
 router.get("/competition/ws/solo",
     verifyAndParseJWT,
-    async (ctx: RouterContext<"/competition/ws/solo">) => {
+    (ctx: RouterContext<"/competition/ws/solo">) => {
         if (!ctx.isUpgradable) {
             ctx.throw(
                 STATUS_CODE.BadRequest,
@@ -118,8 +118,7 @@ router.get("/competition/ws/solo",
 // Multi websocket endpoint
 router.get("/competition/ws/multi",
     verifyAndParseJWT,
-    async (ctx: RouterContext<"/competition/ws/multi">) => {
-    await verifyAndParseJWT(ctx, async () => {
+    (ctx: RouterContext<"/competition/ws/multi">) => {
         if (!ctx.isUpgradable) {
             ctx.throw(
                 STATUS_CODE.BadRequest,
@@ -178,6 +177,9 @@ router.get("/competition/ws/multi",
                     case "LEAVE":
                         multiManager.handleLeave(username);
                         break;
+                    case "RTC_OFFER":
+                        multiManager.handleRTCOffer(username, message.payload);
+                        break;
                     default:
                         console.warn(
                             `Unknown message type from ${username}:`,
@@ -199,7 +201,6 @@ router.get("/competition/ws/multi",
                 }));
             }
         };
-    });
     },
 );
 

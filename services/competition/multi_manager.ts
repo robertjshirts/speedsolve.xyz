@@ -70,6 +70,9 @@ export class MultiManager {
             scramble: "",
             results: {},
             start_time: null,
+            rtcOffers: new Map(),
+            rtcAnswers: new Map(),
+            iceCandidates: new Map(),
         };
 
         this.activeSessions.set(username, initialSession);
@@ -78,12 +81,19 @@ export class MultiManager {
             payload: initialSession,
         });
 
+        // Add user to queue and check if we have a full queue
+        // TODO: Add queue logic to check avg solve speed 
         const queue = this.userQueues.get(cube_type);
         if (!queue) {
+            // Create new queue
             this.userQueues.set(cube_type, new Set([username]));
         } else {
+            // Add user to existing queue
             queue.add(username);
+
+            // Check if we have a full queue
             if (queue.size >= 2) {
+                // Match players
                 const participants = Array.from(queue.values()).slice(0, 2);
                 console.log(`Matching players ${participants[0]} and ${participants[1]}`);
                 
@@ -101,12 +111,52 @@ export class MultiManager {
                 // Update second player's session reference
                 this.activeSessions.set(participants[1], session);
 
+                // Notify all participants in the session
                 this.notifySession(session, {
                     type: "SESSION_UPDATE",
                     payload: session,
                 });
             }
         }
+    }
+
+    handleRTCOffer(username: string, offer: RTCSessionDescription) {
+        const session = this.activeSessions.get(username);
+        if (!session) return;
+
+        session.rtcOffers!.set(username, offer);
+
+        this.notifySession(session, {
+            type: "RTC_OFFER",
+            payload: { username, offer },
+        });
+    }
+
+    handleRTCAnswer(username: string, answer: RTCSessionDescription) {
+        const session = this.activeSessions.get(username);
+        if (!session) return;
+
+        session.rtcAnswers!.set(username, answer);
+
+        this.notifySession(session, {
+            type: "RTC_ANSWER",
+            payload: { username, answer },
+        });
+    }
+
+    handleICECandidate(username: string, candidate: RTCIceCandidate) {
+        const session = this.activeSessions.get(username);
+        if (!session) return;
+
+        if (!session.iceCandidates!.has(username)) {
+            session.iceCandidates!.set(username, []);
+        }
+
+        session.iceCandidates!.get(username)!.push(candidate);
+        this.notifySession(session, {
+            type: "ICE_CANDIDATE",
+            payload: { username, candidate },
+        });
     }
 
     handleReady(username: string) {

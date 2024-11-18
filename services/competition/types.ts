@@ -1,3 +1,5 @@
+/// <reference lib="dom" />
+
 declare global {
 	type SessionType = "solo" | "multi";
 	type SessionState = "queuing" | "scrambling" | "solving" | "complete";
@@ -7,14 +9,28 @@ declare global {
 	type CommonMessageType = "ERROR" | "SESSION_UPDATE";
 
 	// Solo-specific message types
-	type SoloMessageType = CommonMessageType | "SOLO_START" | "READY" | "SOLVE_COMPLETE" | "PENALTY";
+	type SoloMessageType =
+		| CommonMessageType
+		| "SOLO_START"
+		| "READY"
+		| "SOLVE_COMPLETE"
+		| "PENALTY";
 	type SoloWebSocketMessage = {
 		type: SoloMessageType;
 		payload?: any;
 	};
 
 	// Multi-specific message types
-	type MultiMessageType = CommonMessageType | "QUEUE" | "READY" | "SOLVE_COMPLETE" | "PENALTY" | "LEAVE";
+	type MultiMessageType =
+		| CommonMessageType
+		| "QUEUE"
+		| "READY"
+		| "SOLVE_COMPLETE"
+		| "PENALTY"
+		| "LEAVE"
+		| "RTC_OFFER"
+		| "RTC_ANSWER"
+		| "ICE_CANDIDATE";
 	type MultiWebSocketMessage = {
 		type: MultiMessageType;
 		payload?: any;
@@ -36,5 +52,8 @@ declare global {
 		scramble: string;
 		results: Record<string, Result>;
 		start_time: number | null;
+		rtcOffers?: Map<string, RTCSessionDescription>;
+		rtcAnswers?: Map<string, RTCSessionDescription>;
+		iceCandidates?: Map<string, RTCIceCandidate[]>;
 	};
 }

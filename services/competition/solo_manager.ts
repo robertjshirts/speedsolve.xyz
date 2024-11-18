@@ -1,5 +1,6 @@
 import { generateScramble } from "./scrambler.ts";
-import { SessionDB, SolveDB } from "./models.ts";
+import Database from "./models.ts";
+const { SessionDB, SolveDB } = Database.defineModels();
 
 export class SoloManager {
     private activeSessions: Map<string, CompetitionState> = new Map();

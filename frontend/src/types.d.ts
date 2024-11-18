@@ -13,7 +13,7 @@ declare global {
   type ConnectionState = "disconnected" | "connecting" | "connected";
 
   type SessionType = "solo" | "multi";
-  type SessionState = "queuing" | "scrambling" | "solving" | "complete";
+  type SessionState = "queuing" | "webrtc" | "scrambling" | "solving" | "complete";
   type CubeType = "3x3" | "2x2";
   type Penalty = "DNF" | "plus2" | "none";
 
