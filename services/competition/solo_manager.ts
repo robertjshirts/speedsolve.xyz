@@ -1,45 +1,99 @@
 import { generateScramble } from "./scrambler.ts";
 import Database from "./models.ts";
+
 const { SessionDB, SolveDB } = Database.defineModels();
 
+type SoloClientMessageType = "create_session" | "start_solve" | "complete_solve" | "apply_penalty" | "end_session";
+type SoloServerMessageType = "session_created" | "solve_started" | "solve_completed" | "penalty_applied" | "error";
+
+interface SoloSession {
+    id: string;
+    state: SessionState;
+    cube_type: CubeType;
+    participant: string;
+    scramble: string;
+    start_time: number | null;
+    result: Result | null;
+}
+
+interface SoloServerMessage {
+    type: SoloServerMessageType;
+    payload?: any;
+}
+
+interface SoloClientMessage {
+    type: SoloClientMessageType;
+    payload?: any;
+}
+
 export class SoloManager {
-    private activeSessions: Map<string, CompetitionState> = new Map();
+    private activeSessions: Map<string, SoloSession> = new Map();
     private connections: Map<string, WebSocket> = new Map();
+    private testing = false;
+
+    constructor(testing = false) {
+        this.testing = testing;
+    }
 
     addConnection(username: string, ws: WebSocket) {
         this.connections.set(username, ws);
         this.activeSessions.delete(username);
+        ws.onmessage = (event) => this.handleMessage(username, event);
+        ws.onclose = () => this.handleDisconnect(username);
+        ws.onerror = () => this.handleDisconnect(username);
     }
 
     handleDisconnect(username: string) {
+        console.log(`User ${username} disconnected`);
         this.activeSessions.delete(username);
         this.connections.delete(username);
     }
 
-    handleSoloStart(username: string, cube_type: CubeType) {
-        const session: CompetitionState = {
+    getActiveSessions() {
+        return Array.from(this.activeSessions.values());
+    }
+
+    getActiveSession(username: string) {
+        return this.activeSessions.get(username);
+    }
+
+    private handleMessage(username: string, event: MessageEvent) {
+        const message = JSON.parse(event.data as string) as SoloClientMessage;
+        switch (message.type) {
+            case "create_session": this.handleCreateSession(username, message.payload.cube_type); break;
+            case "start_solve": this.handleStartSolve(username); break;
+            case "complete_solve": this.handleSolveComplete(username, message.payload.time); break;
+            case "apply_penalty": this.handlePenalty(username, message.payload.penalty); break;
+            case "end_session": this.handleDisconnect(username); break;
+        }
+    }
+
+    private handleCreateSession(username: string, cube_type: CubeType) {
+        const session: SoloSession = {
             id: crypto.randomUUID(),
-            type: "solo",
             state: "scrambling",
             cube_type: cube_type,
-            participants: new Set([username]),
             scramble: generateScramble(cube_type),
-            results: {},
+            participant: username,
+            result: null,
             start_time: null,
         };
 
         this.activeSessions.set(username, session);
         this.notifyUser(username, {
-            type: "SESSION_UPDATE",
-            payload: session,
+            type: "session_created",
+            payload: {
+                state: session.state,
+                scramble: session.scramble,
+            }
         });
     }
 
-    handleReady(username: string) {
+    private handleStartSolve(username: string) {
         const session = this.activeSessions.get(username);
         if (!session || session.state !== "scrambling") {
             this.notifyUser(username, {
-                type: "ERROR",
+                type: "error",
                 payload: `Invalid state, user ${username} is not in a valid state to start solving`,
             });
             return;
@@ -49,22 +103,29 @@ export class SoloManager {
         session.start_time = Date.now();
 
         this.notifyUser(username, {
-            type: "SESSION_UPDATE",
-            payload: session,
+            type: "solve_started",
+            payload: {
+                state: session.state,
+                start_time: session.start_time,
+            },
         });
     }
 
-    async handleSolveComplete(username: string, result: Result) {
+    private async handleSolveComplete(username: string, time: number) {
         const session = this.activeSessions.get(username);
         if (!session || !session.start_time) {
             this.notifyUser(username, {
-                type: "ERROR",
+                type: "error",
                 payload: `Invalid state, user ${username} is not in a valid state to complete a solve`,
             });
             return;
         }
 
-        result.id = crypto.randomUUID();
+        const result: Result = {
+            id: crypto.randomUUID(),
+            time: time,
+            penalty: "none",
+        };
 
         const server_time = Date.now() - session.start_time;
         const time_diff = Math.abs(server_time - result.time);
@@ -74,70 +135,80 @@ export class SoloManager {
             result.time = server_time;
         }
 
-        session.results[username] = result;
-        session.state = "complete";
+        session.result = result;
+        session.state = "results";
         await this.storeSession(session);
-        
-        this.notifyUser(username, {
-            type: "SESSION_UPDATE",
-            payload: session,
-        });
+
+        const message: SoloServerMessage = {
+            type: "solve_completed",
+            payload: {
+                state: session.state,
+                result: result,
+            },
+        };
+        this.notifyUser(username, message);
     }
 
-    async handlePenalty(username: string, penalty: "DNF" | "plus2" | "none" = "none") {
+    private async handlePenalty(username: string, penalty: "DNF" | "plus2" | "none" = "none") {
         const session = this.activeSessions.get(username);
-        if (!session || !session.results[username]) {
+        if (!session || !session.result) {
             this.notifyUser(username, {
-                type: "ERROR",
+                type: "error",
                 payload: `User ${username} is not in a session to apply a penalty`,
             });
             return;
         }
 
-        session.results[username].penalty = penalty;
+        session.result.penalty = penalty;
         await this.storeSession(session);
-        
         this.notifyUser(username, {
-            type: "SESSION_UPDATE",
-            payload: session,
+            type: "penalty_applied",
+            payload: {
+                state: session.state,
+                result: session.result,
+            },
         });
     }
 
-    private notifyUser(username: string, payload: SoloWebSocketMessage) {
+    private notifyUser(username: string, message: SoloServerMessage) {
         const ws = this.connections.get(username);
-        if (ws && ws.readyState === 1) {
-            if (payload.type === "SESSION_UPDATE") {
-                const sessionPayload = { ...payload.payload };
-                sessionPayload.participants = Array.from(sessionPayload.participants);
-                ws.send(JSON.stringify({ ...payload, payload: sessionPayload }));
-            } else {
-                ws.send(JSON.stringify(payload));
-            }
-        }
+        if (!ws) return this.handleDisconnect(username);
+        ws.send(JSON.stringify(message));
     }
 
-    private async storeSession(session: CompetitionState) {
-        const participant = Array.from(session.participants)[0];
-        
+    private async storeSession(session: SoloSession) {
+        // Skip storing in testing
+        // I love deno but FUCK YOU this is stupid
+        if (this.testing) return;
+
+        const result = session.result;
+        if (!result) {
+            this.notifyUser(session.participant, {
+                type: "error",
+                payload: "No result to store",
+            });
+            return;
+        }
+
         // Store session
         await SessionDB.upsert({
             id: session.id,
-            type: session.type,
-            player_one: participant,
-            player_two: null,
-            winner: participant,
+            type: "solo",
+            player_one: session.participant,
+            player_two: null,   
+            winner: session.participant,
             cube_type: session.cube_type,
         });
 
-        // Store solve
-        const result = session.results[participant];
         await SolveDB.upsert({
-            username: participant,
             id: result.id!,
+            username: session.participant,
+            type: 'solo',
             session_id: session.id,
             scramble: session.scramble,
             time: result.time,
             penalty: result.penalty,
         });
     }
+
 }

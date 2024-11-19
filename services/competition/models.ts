@@ -5,6 +5,7 @@ class Database {
 
 	static getInstance(): Sequelize {
 		if (!this.instance) {
+			console.log("Connecting to database at ", Deno.env.get("PGHOST")!);
 			this.instance = new Sequelize(
 				Deno.env.get("PGDATABASE")!,
 				Deno.env.get("PGUSER")!,
@@ -18,7 +19,7 @@ class Database {
 		return this.instance;
 	}
 
-	static defineModels(): { SessionDB: any; SolveDB: any } {
+	static defineModels() {
 		const sequelize = this.getInstance();
 
 		const SessionDB = sequelize.define(
@@ -75,9 +76,12 @@ class Database {
 					allowNull: false,
 					defaultValue: DataTypes.UUIDV4,
 				},
+				type: {
+					type: DataTypes.ENUM("solo", "multi"),
+					allowNull: false,
+				},
 				session_id: {
 					type: DataTypes.UUID,
-					allowNull: false,
 				},
 				scramble: {
 					type: DataTypes.STRING,
@@ -117,7 +121,10 @@ class Database {
 			await sequelize.authenticate();
 			console.log("Connection has been established successfully.");
 
-			const { SessionDB, SolveDB } = this.defineModels();
+			// Define models
+			this.defineModels();
+			// Sync models
+			// TODO: remove force after finalizing schema
 			await sequelize.sync({ force: true });
 		} catch (error) {
 			console.error("Unable to connect to the database:", error);

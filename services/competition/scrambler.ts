@@ -1,4 +1,4 @@
-export const generateScramble = (cube_type: CubeType) => {
+export function generateScramble(cube_type: CubeType): string {
 	if (
 		cube_type === "3x3" ||
 		cube_type === "2x2"
@@ -8,7 +8,7 @@ export const generateScramble = (cube_type: CubeType) => {
 	return "R U R' U'";
 };
 
-const generateScrambleFor3x3 = () => {
+function generateScrambleFor3x3(): string {
 	const turnMoves = ['U', 'D', 'R', 'L', 'F', 'B'];
 
     const hasDone: string[] = [];

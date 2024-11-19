@@ -26,7 +26,6 @@ Deno.test("0-9999ms wait | 0-4999ms diff | Level 1", async (t) => {
   let matchPromise: Promise<QueueMatch> | undefined;
 
   try {
-
     await t.step("special case: 2 users with 0ms solve time", async () => {
       // add users to queue
       matchPromise = waitForMatch(queue);
@@ -36,7 +35,7 @@ Deno.test("0-9999ms wait | 0-4999ms diff | Level 1", async (t) => {
       // wait for match
       const match = await matchPromise!;
       assertArrayIncludes(
-        [match.user1, match.user2],
+        [match.user, match.match],
         [testData.user1, testData.user2],
         "Users should be matched immediately",
       );
@@ -56,7 +55,7 @@ Deno.test("0-9999ms wait | 0-4999ms diff | Level 1", async (t) => {
       // wait for match
       const match = await matchPromise!;
       assertArrayIncludes(
-        [match.user1, match.user2],
+        [match.user, match.match],
         [testData.user1, testData.user2],
         "Users should be matched immediately",
       );
@@ -77,7 +76,7 @@ Deno.test("0-9999ms wait | 0-4999ms diff | Level 1", async (t) => {
       // wait for match
       const match = await matchPromise!;
       assertArrayIncludes(
-        [match.user1, match.user2],
+        [match.user, match.match],
         [testData.user1, testData.user2],
         "Users should be matched immediately",
       );
@@ -97,7 +96,7 @@ Deno.test("0-9999ms wait | 0-4999ms diff | Level 1", async (t) => {
       // wait for match
       const match = await matchPromise!;
       assertArrayIncludes(
-        [match.user1, match.user2],
+        [match.user, match.match],
         [testData.user1, testData.user2],
         "Users should be matched immediately",
       );
@@ -118,7 +117,7 @@ Deno.test("0-9999ms wait | 0-4999ms diff | Level 1", async (t) => {
       // wait for match
       const match = await matchPromise!;
       assertArrayIncludes(
-        [match.user1, match.user2],
+        [match.user, match.match],
         [testData.user1, testData.user2],
         "Users should be matched immediately",
       );
@@ -188,7 +187,7 @@ Deno.test("10000-19999ms wait | 5001-10000ms diff | Level 2", async (t) => {
       const match = await matchPromise!;
 
       assertArrayIncludes(
-        [match.user1, match.user2],
+        [match.user, match.match],
         [testData.user1, testData.user2],
         "Users should be matched after 10 seconds have passed",
       );
@@ -238,7 +237,7 @@ Deno.test("10000-19999ms wait | 5001-10000ms diff | Level 2", async (t) => {
       // wait for match
       const match = await matchPromise!;
       assertArrayIncludes(
-        [match.user1, match.user2],
+        [match.user, match.match],
         [testData.user1, testData.user2],
         "Users should be matched after 10 seconds have passed",
       );
@@ -303,7 +302,7 @@ Deno.test("20000-Infinity ms wait | 10001-Infinity ms diff | Level 3", async (t)
       // wait for match
       const match = await matchPromise!;
       assertArrayIncludes(
-        [match.user1, match.user2],
+        [match.user, match.match],
         [testData.user1, testData.user2],
         "Users should be matched after 20 seconds have passed",
       );
@@ -352,7 +351,7 @@ Deno.test("20000-Infinity ms wait | 10001-Infinity ms diff | Level 3", async (t)
       // wait for match
       const match = await matchPromise!;
       assertArrayIncludes(
-        [match.user1, match.user2],
+        [match.user, match.match],
         [testData.user1, testData.user2],
         "Users should be matched after 20 seconds have passed",
       );

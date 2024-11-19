@@ -2,7 +2,7 @@
 
 declare global {
 	type SessionType = "solo" | "multi";
-	type SessionState = "queuing" | "scrambling" | "solving" | "complete";
+	type SessionState = "queuing" | "connecting" | "scrambling" | "countdown" | "solving" | "results";
 	type CubeType = "3x3" | "2x2";
 
 	// Common message types
