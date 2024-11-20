@@ -1,59 +1,95 @@
 /// <reference lib="dom" />
 
-declare global {
-	type SessionType = "solo" | "multi";
-	type SessionState = "queuing" | "connecting" | "scrambling" | "countdown" | "solving" | "results";
-	type CubeType = "3x3" | "2x2";
+//#region Session types
+export type SessionState = "queuing" | "connecting" | "scrambling" | "countdown" | "solving" | "results";
+export type CubeType = "3x3" | "2x2";
 
-	// Common message types
-	type CommonMessageType = "ERROR" | "SESSION_UPDATE";
+export type Result = {
+	id?: string;
+	time: number;
+	penalty: "DNF" | "plus2" | "none";
+};
 
-	// Solo-specific message types
-	type SoloMessageType =
-		| CommonMessageType
-		| "SOLO_START"
-		| "READY"
-		| "SOLVE_COMPLETE"
-		| "PENALTY";
-	type SoloWebSocketMessage = {
-		type: SoloMessageType;
-		payload?: any;
-	};
-
-	// Multi-specific message types
-	type MultiMessageType =
-		| CommonMessageType
-		| "QUEUE"
-		| "READY"
-		| "SOLVE_COMPLETE"
-		| "PENALTY"
-		| "LEAVE"
-		| "RTC_OFFER"
-		| "RTC_ANSWER"
-		| "ICE_CANDIDATE";
-	type MultiWebSocketMessage = {
-		type: MultiMessageType;
-		payload?: any;
-	};
-
-	type Result = {
-		id?: string;
-		time: number;
-		penalty: "DNF" | "plus2" | "none";
-	};
-
-	type CompetitionState = {
-		id: string;
-		type: SessionType;
-		state: SessionState;
-		cube_type: CubeType;
-		participants: Set<string>;
-		readyParticipants?: Set<string>;
-		scramble: string;
-		results: Record<string, Result>;
-		start_time: number | null;
-		rtcOffers?: Map<string, RTCSessionDescription>;
-		rtcAnswers?: Map<string, RTCSessionDescription>;
-		iceCandidates?: Map<string, RTCIceCandidate[]>;
-	};
+export interface SoloSession {
+	id: string;
+	state: SessionState;
+	cube_type: CubeType;
+	participant: string;
+	scramble: string;
+	start_time: number | null;
+	result: Result | null;
 }
+
+export interface MultiSession {
+	id: string;
+	cube_type: CubeType;
+	participants: Set<string>;
+	readyParticipants: Set<string>;
+	state: SessionState;
+	scramble: string;
+	results: Record<string, Result>;
+	start_time: number | null;
+	timeoutId: number | null;
+}
+//#endregion
+
+//#region Multi Message types
+export type MultiClientMessageType = 
+	| "start_q" 
+	| "cancel_q" 
+	| "chat_message" 
+	| "rtc_offer" 
+	| "rtc_answer" 
+	| "rtc_candidate" 
+	| "rtc_connected" 
+	| "finish_scramble"
+	| "start_countdown"
+	| "cancel_countdown"
+	| "finish_solve"
+	| "apply_penalty"
+	| "leave_session";
+
+type MultiServerMessageType = 
+	| "state_change" 
+	| "error" 
+	| "peer_ready" 
+	| "peer_unready" 
+	| "peer_disconnected" 
+	| "countdown_started" 
+	| "countdown_canceled" 
+	| "results_update";
+
+export interface MultiClientMessage {
+	type: MultiClientMessageType;
+	payload?: Record<string, any>;
+}
+
+export interface MultiServerMessage {
+	type: MultiServerMessageType;
+	payload?: Record<string, any>;
+}
+//#endregion
+
+//#region Solo Message types
+export type SoloClientMessageType = 
+	| "start_session" 
+	| "finish_scramble" 
+	| "finish_solve" 
+	| "apply_penalty" 
+	| "leave_session";
+
+export type SoloServerMessageType = 
+	| "state_change"
+	| "results_update"
+	| "error";
+
+export interface SoloServerMessage {
+    type: SoloServerMessageType;
+    payload?: any;
+}
+
+export interface SoloClientMessage {
+    type: SoloClientMessageType;
+    payload?: any;
+}
+//#endregion

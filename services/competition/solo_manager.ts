@@ -1,30 +1,6 @@
 import { generateScramble } from "./scrambler.ts";
-import Database from "./models.ts";
+import type { CubeType, SoloSession, SoloClientMessage, SoloServerMessage, Result, SessionState } from "./types.ts";
 
-const { SessionDB, SolveDB } = Database.defineModels();
-
-type SoloClientMessageType = "create_session" | "start_solve" | "complete_solve" | "apply_penalty" | "end_session";
-type SoloServerMessageType = "session_created" | "solve_started" | "solve_completed" | "penalty_applied" | "error";
-
-interface SoloSession {
-    id: string;
-    state: SessionState;
-    cube_type: CubeType;
-    participant: string;
-    scramble: string;
-    start_time: number | null;
-    result: Result | null;
-}
-
-interface SoloServerMessage {
-    type: SoloServerMessageType;
-    payload?: any;
-}
-
-interface SoloClientMessage {
-    type: SoloClientMessageType;
-    payload?: any;
-}
 
 export class SoloManager {
     private activeSessions: Map<string, SoloSession> = new Map();
@@ -44,31 +20,55 @@ export class SoloManager {
     }
 
     handleDisconnect(username: string) {
-        console.log(`User ${username} disconnected`);
         this.activeSessions.delete(username);
         this.connections.delete(username);
     }
 
     getActiveSessions() {
-        return Array.from(this.activeSessions.values());
-    }
-
-    getActiveSession(username: string) {
-        return this.activeSessions.get(username);
+        return structuredClone(this.activeSessions);
     }
 
     private handleMessage(username: string, event: MessageEvent) {
         const message = JSON.parse(event.data as string) as SoloClientMessage;
         switch (message.type) {
-            case "create_session": this.handleCreateSession(username, message.payload.cube_type); break;
-            case "start_solve": this.handleStartSolve(username); break;
-            case "complete_solve": this.handleSolveComplete(username, message.payload.time); break;
-            case "apply_penalty": this.handlePenalty(username, message.payload.penalty); break;
-            case "end_session": this.handleDisconnect(username); break;
+            case "start_session":
+                if (!message.payload?.cube_type) {
+                    this.notifyUser(username, {
+                        type: "error",
+                        payload: "No cube_type provided",
+                    });
+                    return;
+                }
+                this.startSession(username, message.payload.cube_type); 
+                break; 
+            case "finish_scramble": 
+                this.finishScramble(username); 
+                break;
+            case "finish_solve": 
+                if (!message.payload?.time) {
+                    this.notifyUser(username, {
+                        type: "error",
+                        payload: "No time provided",
+                    });
+                    return;
+                }
+                this.finishSolve(username, message.payload.time); 
+                break;
+            case "apply_penalty": 
+                if (!message.payload?.penalty) {
+                    this.notifyUser(username, {
+                        type: "error",
+                        payload: "No penalty provided",
+                    });
+                    return;
+                }
+                this.handlePenalty(username, message.payload.penalty); 
+                break;
+            case "leave_session": this.handleDisconnect(username); break;
         }
     }
 
-    private handleCreateSession(username: string, cube_type: CubeType) {
+    private startSession(username: string, cube_type: CubeType) {
         const session: SoloSession = {
             id: crypto.randomUUID(),
             state: "scrambling",
@@ -80,21 +80,18 @@ export class SoloManager {
         };
 
         this.activeSessions.set(username, session);
-        this.notifyUser(username, {
-            type: "session_created",
-            payload: {
-                state: session.state,
-                scramble: session.scramble,
-            }
+
+        this.changeState(session, "scrambling", {
+            scramble: session.scramble,
         });
     }
 
-    private handleStartSolve(username: string) {
+    private finishScramble(username: string) {
         const session = this.activeSessions.get(username);
         if (!session || session.state !== "scrambling") {
             this.notifyUser(username, {
                 type: "error",
-                payload: `Invalid state, user ${username} is not in a valid state to start solving`,
+                payload: "Not in scrambling state. Cannot finish scrambling.",
             });
             return;
         }
@@ -102,21 +99,17 @@ export class SoloManager {
         session.state = "solving";
         session.start_time = Date.now();
 
-        this.notifyUser(username, {
-            type: "solve_started",
-            payload: {
-                state: session.state,
-                start_time: session.start_time,
-            },
+        this.changeState(session, "solving", {
+            start_time: session.start_time,
         });
     }
 
-    private async handleSolveComplete(username: string, time: number) {
+    private async finishSolve(username: string, time: number) {
         const session = this.activeSessions.get(username);
-        if (!session || !session.start_time) {
+        if (!session || session.state !== "solving") {
             this.notifyUser(username, {
                 type: "error",
-                payload: `Invalid state, user ${username} is not in a valid state to complete a solve`,
+                payload: "Not in solving state. Cannot finish solve.",
             });
             return;
         }
@@ -127,7 +120,7 @@ export class SoloManager {
             penalty: "none",
         };
 
-        const server_time = Date.now() - session.start_time;
+        const server_time = Date.now() - session.start_time!;
         const time_diff = Math.abs(server_time - result.time);
 
         // Basic validation, if time_diff greater than 2 seconds, use server_time instead
@@ -136,37 +129,40 @@ export class SoloManager {
         }
 
         session.result = result;
-        session.state = "results";
         await this.storeSession(session);
 
-        const message: SoloServerMessage = {
-            type: "solve_completed",
-            payload: {
-                state: session.state,
-                result: result,
-            },
-        };
-        this.notifyUser(username, message);
+        this.changeState(session, "results", {
+            result: result,
+        });
     }
 
     private async handlePenalty(username: string, penalty: "DNF" | "plus2" | "none" = "none") {
         const session = this.activeSessions.get(username);
-        if (!session || !session.result) {
+        if (!session || session.state !== "results") {
             this.notifyUser(username, {
                 type: "error",
-                payload: `User ${username} is not in a session to apply a penalty`,
+                payload: "Not in solving state. Cannot apply penalty.",
             });
             return;
         }
 
-        session.result.penalty = penalty;
+        session.result!.penalty = penalty;
         await this.storeSession(session);
         this.notifyUser(username, {
-            type: "penalty_applied",
+            type: "results_update",
             payload: {
-                state: session.state,
                 result: session.result,
             },
+        });
+    }
+
+    private changeState(session: SoloSession, state: SessionState, payload?: Record<string, any>) {
+        session.state = state;
+        payload = payload || {};
+        payload.state = state;
+        this.notifyUser(session.participant, {
+            type: "state_change",
+            payload,
         });
     }
 
@@ -189,26 +185,7 @@ export class SoloManager {
             });
             return;
         }
-
-        // Store session
-        await SessionDB.upsert({
-            id: session.id,
-            type: "solo",
-            player_one: session.participant,
-            player_two: null,   
-            winner: session.participant,
-            cube_type: session.cube_type,
-        });
-
-        await SolveDB.upsert({
-            id: result.id!,
-            username: session.participant,
-            type: 'solo',
-            session_id: session.id,
-            scramble: session.scramble,
-            time: result.time,
-            penalty: result.penalty,
-        });
+        // TODO: store session
     }
 
 }

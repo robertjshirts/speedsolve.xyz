@@ -21,74 +21,25 @@ class Database {
 
 	static defineModels() {
 		const sequelize = this.getInstance();
-
-		const SessionDB = sequelize.define(
-			"session",
-			{
-				id: {
-					type: DataTypes.UUID,
-					primaryKey: true,
-					allowNull: false,
-					defaultValue: DataTypes.UUIDV4,
-				},
-				type: {
-					type: DataTypes.ENUM("solo", "multi"),
-					allowNull: false,
-				},
-				player_one: {
-					type: DataTypes.STRING,
-					allowNull: false,
-				},
-				player_two: {
-					type: DataTypes.STRING,
-					allowNull: true,
-				},
-				winner: {
-					type: DataTypes.STRING,
-					allowNull: true,
-				},
-			},
-			{
-				timestamps: true,
-				underscored: true,
-				indexes: [
-					{ unique: false, fields: ["player_one"] },
-					{
-						unique: false,
-						fields: ["player_two"],
-						where: { player_two: { [Op.not]: null } },
-					},
-					{
-						unique: false,
-						fields: ["winner"],
-						where: { winner: { [Op.not]: null } },
-					},
-				],
-			},
-		);
-
 		const SolveDB = sequelize.define(
 			"solve",
 			{
-				id: {
+				solve_id: {
 					type: DataTypes.UUID,
 					primaryKey: true,
 					allowNull: false,
 					defaultValue: DataTypes.UUIDV4,
 				},
-				type: {
-					type: DataTypes.ENUM("solo", "multi"),
+				username: {
+					type: DataTypes.STRING,
 					allowNull: false,
-				},
-				session_id: {
-					type: DataTypes.UUID,
 				},
 				scramble: {
 					type: DataTypes.STRING,
 					allowNull: false,
 				},
-				username: {
-					type: DataTypes.STRING,
+				type: {
+					type: DataTypes.ENUM("solo", "multi"),
 					allowNull: false,
 				},
 				time: {
@@ -100,19 +51,73 @@ class Database {
 					defaultValue: "none",
 					allowNull: false,
 				},
+				cube: {
+					type: DataTypes.ENUM("2x2", "3x3"),
+					allowNull: false,
+				}
 			},
 			{
 				timestamps: true,
 				underscored: true,
 				indexes: [
-					{ unique: false, fields: ["session_id"] },
 					{ unique: false, fields: ["username"] },
 				],
 			},
 		);
+		const CompetitionDB = sequelize.define(
+			"competition",
+			{
+				id: {
+					type: DataTypes.UUID,
+					primaryKey: true,
+					allowNull: false,
+					defaultValue: DataTypes.UUIDV4,
+				},
+				winner: {
+					type: DataTypes.STRING,
+					allowNull: false,
+				},
+			},
+		);
+		const ParticipantsDB = sequelize.define(
+			"participants",
+			{
+				competition_id: {
+					type: DataTypes.UUID,
+					allowNull: false,
+					primaryKey: true,
+					references: {
+						model: CompetitionDB,
+						key: "id",
+					},
+				},
+				solve_id: {
+					type: DataTypes.UUID,
+					allowNull: false,
+					primaryKey: true,
+					references: {
+						model: SolveDB,
+						key: "solve_id",
+					},
+				},
+				participant: {
+					type: DataTypes.STRING,
+					allowNull: false,
+				},
+			},
+			{
+				timestamps: true,
+				underscored: true,
+				indexes: [
+					{ unique: false, fields: ["competition_id"] },
+					{ unique: false, fields: ["solve_id"] },
+					{ unique: false, fields: ["participant"] },
+				],
+			}
+		);
 
-		SessionDB.hasMany(SolveDB);
-		return { SessionDB, SolveDB };
+		// TODO: add relationships
+		CompetitionDB.hasMany(ParticipantsDB);
 	}
 
 	static async initialize(): Promise<void> {

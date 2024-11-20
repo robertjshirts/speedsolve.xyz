@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import type { CubeType } from "./types.ts";
 
 export interface QueueUser {
   username: string;

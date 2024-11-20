@@ -1,327 +1,411 @@
-// import { generateScramble } from "./scrambler.ts";
-// import { SessionDB, SolveDB } from "./models.ts";
+import { generateScramble } from "./scrambler.ts";
+import { SpeedcubeQueue, QueueMatch } from "./speedcube_queue.ts";
+import type { MultiSession, MultiClientMessage, MultiServerMessage, Result, SessionState, CubeType } from "./types.ts";
 
-// export class MultiManager {
-//     private activeSessions: Map<string, CompetitionState> = new Map();
-//     private connections: Map<string, WebSocket> = new Map();
-//     private testing = false;
+import Database from "./models.ts";
 
-//     constructor(testing = false) {
-//         this.testing = testing;
-//     }
 
-//     addConnection(username: string, ws: WebSocket) {
-//         this.connections.set(username, ws);
-//         this.activeSessions.delete(username);
 
-//     }
+export class MultiManager {
+  private activeSessions: Map<string, MultiSession> = new Map();
+  private connections: Map<string, WebSocket> = new Map();
+  private queues: SpeedcubeQueue;
+  private testing = false;
 
-// 	handleDisconnect(username: string) {
-// 		const session = this.activeSessions.get(username);
-// 		if (session) {
-// 			// Notify only other participants in the session
-//             for (const participant of session.participants) {
-//                 if (participant !== username) {
-//                     this.notifyUser(participant, {
-//                         type: "ERROR",
-//                         payload: `User ${username} disconnected`,
-//                     });
-//                 }
-//             }
-//             // Clean up session for all participants
-//             for (const participant of session.participants) {
-//                 this.activeSessions.delete(participant);
-//             }
-//         }
-//         this.connections.delete(username);
-//         this.removeFromQueue(username);
-//     }
+  constructor(testing = false) {
+    this.queues = new SpeedcubeQueue();
+    this.queues.addListener("match", this.handleMatchMade.bind(this));
+    this.testing = testing;
+  }
 
-//     handleQueue(username: string, cube_type: CubeType) {
-//         console.log(`User ${username} enqueued for ${cube_type}`);
-        
-//         // Check if user is in an active session
-//         const session = this.activeSessions.get(username);
-//         if (session && session.state !== "complete") {
-//             this.notifyUser(username, {
-//                 type: "ERROR",
-//                 payload: "Cannot queue while in an active session",
-//             });
-//             return;
-//         }
+  cleanup() {
+    this.activeSessions.clear();
+    this.connections.clear();
+    this.queues.cleanup();
+  }
 
-//         this.activeSessions.delete(username);
+  addConnection(username: string, ws: WebSocket) {
+    this.connections.set(username, ws);
+    this.activeSessions.delete(username);
+    ws.onmessage = (event) => this.handleMessage(username, event);
+    ws.onclose = () => this.handleDisconnect(username);
+    ws.onerror = () => this.handleDisconnect(username);
+  }
 
-//         // Check if user is already in any queue
-//         for (const [queueType, queue] of this.userQueues.entries()) {
-//             if (queue.has(username)) {
-//                 this.notifyUser(username, {
-//                     type: "ERROR",
-//                     payload: `Already queued for ${queueType}`,
-//                 });
-//                 return;
-//             }
-//         }
+  handleDisconnect(username: string) {
+    this.queues.removeFromQueue(username, this.activeSessions.get(username)!.cube_type);
+    this.connections.delete(username);
 
-//         // Create initial session for queuing user
-//         const initialSession: CompetitionState = {
-//             id: crypto.randomUUID(),
-//             type: "multi",
-//             state: "queuing",
-//             cube_type: cube_type,
-//             participants: new Set([username]),
-//             readyParticipants: new Set(),
-//             scramble: "",
-//             results: {},
-//             start_time: null,
-//             rtcOffers: new Map(),
-//             rtcAnswers: new Map(),
-//             iceCandidates: new Map(),
-//         };
+    const session = this.activeSessions.get(username);
+    if (!session) return;
 
-//         this.activeSessions.set(username, initialSession);
-//         this.notifySession(initialSession, {
-//             type: "SESSION_UPDATE",
-//             payload: initialSession,
-//         });
+    this.notifyPeers(username, {
+      type: "peer_disconnected",
+      payload: { peer: username },
+    });
+    for (const participant of session.participants) {
+      this.activeSessions.delete(participant);
+    }
+  }
 
-//         // Add user to queue and check if we have a full queue
-//         // TODO: Add queue logic to check avg solve speed 
-//         const queue = this.userQueues.get(cube_type);
-//         if (!queue) {
-//             // Create new queue
-//             this.userQueues.set(cube_type, new Set([username]));
-//         } else {
-//             // Add user to existing queue
-//             queue.add(username);
+  getActiveSessions() {
+    return structuredClone(this.activeSessions);
+  }
 
-//             // Check if we have a full queue
-//             if (queue.size >= 2) {
-//                 // Match players
-//                 const participants = Array.from(queue.values()).slice(0, 2);
-//                 console.log(`Matching players ${participants[0]} and ${participants[1]}`);
-                
-//                 // Get the first player's session and update it with the second player
-//                 const session = this.activeSessions.get(participants[0])!;
-//                 session.participants.add(participants[1]);
-//                 session.state = "scrambling";
-//                 session.scramble = generateScramble(cube_type);
+  getQueueStatus(username: string) {
+    const session = this.activeSessions.get(username);
+    if (!session) return false;
+    const queue = this.queues.getQueue(session.cube_type);
+    return queue.find(user => user.username === username);
+  }
 
-//                 // Remove matched players from queue
-//                 participants.forEach(participant => {
-//                     queue.delete(participant);
-//                 });
+  private handleMessage(username: string, event: MessageEvent) {
+    const message = JSON.parse(event.data) as MultiClientMessage;
+    switch (message.type) {
+      case "start_q":
+        // Check to make sure cube type is a valid cube type
+        if (!message.payload?.cube_type) {
+          this.notifyUser(username, {
+            type: "error",
+            payload: { message: "No cube_type provided" },
+          });
+          return;
+        }
+        this.startQueue(username, message.payload.cube_type);
+        break;
+      case "cancel_q":
+      case "leave_session":
+        this.handleDisconnect(username);
+        break;
+      case "rtc_connected":
+        this.handleRtcConnected(username);
+        break;
+      case "finish_scramble":
+        this.finishScramble(username);
+        break;
+      case "start_countdown":
+        this.startCountdown(username);
+        break;
+      case "cancel_countdown":
+        this.cancelCountdown(username);
+        break;
+      case "finish_solve":
+        if (!message.payload?.time) {
+          this.notifyUser(username, {
+            type: "error",
+            payload: { message: "No time provided" },
+          });
+          return;
+        }
+        this.finishSolve(username, message.payload.time);
+        break;
+      case "apply_penalty":
+        if (!message.payload?.penalty) {
+          this.notifyUser(username, {
+            type: "error",
+            payload: { message: "No penalty provided" },
+          });
+          return;
+        }
+        this.applyPenalty(username, message.payload.penalty);
+        break;
+      // 'Channels' are forwarded to all participants except the sender
+      // For WebRTC and chat
+      case "rtc_offer":
+      case "rtc_answer":
+      case "rtc_candidate":
+      case "chat_message":
+        this.forwardMessage(username, message);
+        break;
+      default:
+        this.notifyUser(username, {
+          type: "error",
+          payload: { message: "Unknown message type" },
+        });
+    }
+  }
 
-//                 // Update second player's session reference
-//                 this.activeSessions.set(participants[1], session);
+  private startQueue(username: string, cube_type: CubeType) {
+    // add minimal session info, just for cube type.
+    const session: MultiSession = {
+      id: username,
+      cube_type,
+      participants: new Set(),
+      readyParticipants: new Set(),
+      state: "queuing",
+      scramble: "",
+      results: {},
+      start_time: null,
+      timeoutId: null,
+    };
+    this.activeSessions.set(username, session);
+    this.notifyUser(username, {
+      type: "state_change",
+      payload: { state: "queuing" },
+    });
+    // Add to queue after notifying user, to not break flow
+    this.queues.addToQueue(username, 0, cube_type);
+  }
 
-//                 // Notify all participants in the session
-//                 this.notifySession(session, {
-//                     type: "SESSION_UPDATE",
-//                     payload: session,
-//                 });
-//             }
-//         }
-//     }
+  private handleMatchMade(matchResult: QueueMatch) {
+    const { user, match, cube_type } = matchResult;
 
-//     handleRTCOffer(username: string, offer: RTCSessionDescription) {
-//         const session = this.activeSessions.get(username);
-//         if (!session) return;
+    // Check state of both users
+    const userSession = this.activeSessions.get(user);
+    const matchSession = this.activeSessions.get(match);
+    if (userSession?.state !== "queuing" || matchSession?.state !== "queuing") {
+      this.notifyUser(user, {
+        type: "error",
+        payload: { message: `${userSession?.state !== "queuing" ? user : match} is not queuing. Cannot make match` },
+      });
+      // Only disconnect users bc this is called from queue listener, not from possibly erroneous user
+      this.handleDisconnect(user);
+      this.handleDisconnect(match);
+      return;
+    }
 
-//         session.rtcOffers!.set(username, offer);
+    // Unify sessions and change state to connecting
+    const session: MultiSession = {
+      id: crypto.randomUUID(),
+      cube_type,
+      participants: new Set([user, match]),
+      readyParticipants: new Set(),
+      state: "connecting",
+      scramble: "",
+      results: {},
+      start_time: null,
+      timeoutId: null,
+    };
+    this.activeSessions.set(user, session);
+    this.activeSessions.set(match, session);
 
-//         this.notifySession(session, {
-//             type: "RTC_OFFER",
-//             payload: { username, offer },
-//         });
-//     }
+    // Notify users of state change
+    [user, match].forEach(username => {
+      this.notifyUser(username, {
+        type: "state_change",
+        payload: {
+          state: "connecting",
+          isOfferer: username === user,
+        },
+      });
+    });
+  }
 
-//     handleRTCAnswer(username: string, answer: RTCSessionDescription) {
-//         const session = this.activeSessions.get(username);
-//         if (!session) return;
+  private handleRtcConnected(username: string) {
+    // Check state
+    const session = this.activeSessions.get(username);
+    if (!session || session.state !== "connecting") {
+      this.notifyUser(username, {
+        type: "error",
+        payload: { message: "Not in connecting state. Cannot connect to peer." },
+      });
+      return;
+    }
 
-//         session.rtcAnswers!.set(username, answer);
+    // Add to connected participants and start scrambling if both are connected
+    session.readyParticipants.add(username);
+    if (session.readyParticipants.size === session.participants.size) {
+      this.changeState(session, "scrambling", {
+        scramble: generateScramble(session.cube_type),
+      });
+    }
+  }
 
-//         this.notifySession(session, {
-//             type: "RTC_ANSWER",
-//             payload: { username, answer },
-//         });
-//     }
+  private finishScramble(username: string) {
+    // Check state
+    const session = this.activeSessions.get(username);
+    if (!session || session.state !== "scrambling") {
+      this.notifyUser(username, {
+        type: "error",
+        payload: { message: "Not in scrambling state. Cannot finish scrambling." },
+      });
+      return;
+    }
 
-//     handleICECandidate(username: string, candidate: RTCIceCandidate) {
-//         const session = this.activeSessions.get(username);
-//         if (!session) return;
+    // Add user to ready participants and check if all participants are ready
+    this.readyPeer(username);
+    if (session.readyParticipants.size === session.participants.size) {
+      this.changeState(session, "countdown");
+    }
+  }
 
-//         if (!session.iceCandidates!.has(username)) {
-//             session.iceCandidates!.set(username, []);
-//         }
+  private startCountdown(username: string) {
+    const session = this.activeSessions.get(username);
+    if (!session || session.state !== "countdown") {
+      this.notifyUser(username, {
+        type: "error",
+        payload: { message: "Not in countdown state. Cannot start countdown." },
+      });
+      return;
+    }
 
-//         session.iceCandidates!.get(username)!.push(candidate);
-//         this.notifySession(session, {
-//             type: "ICE_CANDIDATE",
-//             payload: { username, candidate },
-//         });
-//     }
+    // Clear timeout if it exists
+    if (session.timeoutId) clearTimeout(session.timeoutId);
 
-//     handleReady(username: string) {
-//         const session = this.activeSessions.get(username);
-//         if (!session || session.state !== "scrambling") {
-//             this.notifySession(session!, {
-//                 type: "ERROR",
-//                 payload: `Invalid state, user ${username} is not in a valid state to start solving`,
-//             });
-//             return;
-//         }
+    // Add user to ready participants and check if all participants are ready
+    this.readyPeer(username);
+    if (session.readyParticipants.size === session.participants.size) {
+      this.notifySession(session, {
+        type: "countdown_started",
+      });
+      // Start solving after 3 seconds
+      session.timeoutId = setTimeout(() => {
+        this.handleStartSolving(session);
+      }, 3000);
+    }
+  }
 
-//         if (!session.readyParticipants) {
-//             session.readyParticipants = new Set<string>();
-//         }
-        
-//         session.readyParticipants?.add(username);
+  private cancelCountdown(username: string) {
+    const session = this.activeSessions.get(username);
+    if (!session || session.state !== "countdown") {
+      this.notifyUser(username, {
+        type: "error",
+        payload: { message: "Not in countdown state. Cannot cancel countdown." },
+      });
+      return;
+    }
 
-//         if (session.readyParticipants?.size === session.participants.size) {
-//             session.state = "solving";
-//             session.start_time = Date.now();
-//         }
+    // Update state
+    if (session.timeoutId) clearTimeout(session.timeoutId);
+    session.readyParticipants.delete(username);
 
-//         this.notifySession(session, {
-//             type: "SESSION_UPDATE",
-//             payload: session,
-//         });
-//     }
+    // Notify peers that user is not ready
+    this.notifyPeers(username, {
+      type: "peer_unready",
+      payload: { peer: username },
+    });
 
-//     async handleSolveComplete(username: string, result: Result) {
-//         const session = this.activeSessions.get(username);
-//         if (!session || !session.start_time) {
-//             this.notifySession(session!, {
-//                 type: "ERROR",
-//                 payload: `Invalid state, user ${username} is not in a valid state to complete a solve`,
-//             });
-//             return;
-//         }
+    // Notify session that countdown was canceled
+    this.notifySession(session, {
+      type: "countdown_canceled",
+    });
+  }
 
-//         result.id = crypto.randomUUID();
+  private handleStartSolving(session: MultiSession) {
+    // Update start time
+    session.start_time = Date.now();
 
-//         const server_time = Date.now() - session.start_time;
-//         const time_diff = Math.abs(server_time - result.time);
+    // Change state to solving
+    this.changeState(session, "solving", {
+      start_time: session.start_time,
+    });
+  }
 
-//         // Basic validation, if time_diff greater than 2 seconds, use server_time instead
-//         if (time_diff > 2000) {
-//             result.time = server_time;
-//         }
+  private finishSolve(username: string, time: number) {
+    // Check state
+    const session = this.activeSessions.get(username);
+    if (!session || session.state !== "solving") {
+      this.notifyUser(username, {
+        type: "error",
+        payload: { message: "Not in solving state. Cannot finish solve." },
+      });
+      return;
+    }
 
-//         session.results[username] = result;
-        
-//         // Check if all participants have completed their solves
-//         const allCompleted = Array.from(session.participants).every(
-//             participant => session.results[participant]
-//         );
+    const result: Result = {
+      id: crypto.randomUUID(),
+      penalty: "none",
+      time, 
+    };
 
-//         if (allCompleted) {
-//             session.state = "complete";
-//             await this.storeSession(session);
-//         }
+    // Basic solve validation
+    const serverTime = Date.now() - session.start_time!;
+    const timeDifference = Math.abs(serverTime - time);
+    if (timeDifference > 1000) {
+      result.time = serverTime;
+    }
 
-//         this.notifySession(session, {
-//             type: "SESSION_UPDATE",
-//             payload: session,
-//         });
-//     }
+    // Add solve result
+    session.results[username] = result;
+    this.readyPeer(username);
+    if (session.readyParticipants.size === session.participants.size) {
+      // TODO: store results in db
+      this.changeState(session, "results", {
+        results: session.results,
+      });
+    }
+  }
 
-//     async handlePenalty(username: string, penalty: "DNF" | "plus2" | "none" = "none") {
-//         const session = this.activeSessions.get(username);
-//         if (!session || !session.results[username]) {
-//             this.notifySession(session!, {
-//                 type: "ERROR",
-//                 payload: `User ${username} is not in a session to apply a penalty`,
-//             });
-//             return;
-//         }
+  private applyPenalty(username: string, penalty: "none" | "DNF" | "plus2" = "none") {
+    const session = this.activeSessions.get(username);
+    if (!session || session.state !== "results") {
+      this.notifyUser(username, {
+        type: "error",
+        payload: { message: "Not in results state. Cannot apply penalty." },
+      });
+      return;
+    }
 
-//         session.results[username].penalty = penalty;
-//         await this.storeSession(session);
-        
-//         this.notifySession(session, {
-//             type: "SESSION_UPDATE",
-//             payload: session,
-//         });
-//     }
+    // if penalty is already applied, do nothing
+    if (session.results[username].penalty === penalty) return;
 
-//     handleLeave(username: string) {
-//         this.activeSessions.delete(username);
-//         this.removeFromQueue(username);
-//     }
+    // apply penalty
+    session.results[username].penalty = penalty; 
+    // TODO: store results in db
 
-//     private removeFromQueue(username: string) {
-//         for (const queue of this.userQueues.values()) {
-//             if (queue.has(username)) {
-//                 queue.delete(username);
-//             }
-//         }
-//     }
+    this.notifySession(session, {
+      type: "results_update",
+      payload: { results: session.results },
+    });
+  }
 
-//     private notifySession(session: CompetitionState, payload: MultiWebSocketMessage) {
-//         if (session.participants.size === 0) return;
+  //#region Helper functions
+  private readyPeer(username: string) {
+    const session = this.activeSessions.get(username);
+    if (!session) return;
+    session.readyParticipants.add(username);
+    this.notifyPeers(username, {
+      type: "peer_ready",
+      payload: { peer: username },
+    });
+  }
 
-//         for (const username of session.participants) {
-//             this.notifyUser(username, payload);
-//         }
-//     }
+  private changeState(session: MultiSession, state: SessionState, payload?: Record<string, any>) {
+    // change session
+    session.readyParticipants.clear();
+    session.state = state;
+    if (session.timeoutId) clearTimeout(session.timeoutId);
 
-//     private notifyUser(username: string, payload: MultiWebSocketMessage) {
-//         const ws = this.connections.get(username);
-//         if (ws && ws.readyState === 1) {
-//             if (payload.type === "SESSION_UPDATE") {
-//                 const sessionPayload = { ...payload.payload };
-//                 sessionPayload.participants = Array.from(sessionPayload.participants);
-//                 if (sessionPayload.readyParticipants) {
-//                     sessionPayload.readyParticipants = Array.from(sessionPayload.readyParticipants);
-//                 }
-//                 ws.send(JSON.stringify({ ...payload, payload: sessionPayload }));
-//             } else {
-//                 ws.send(JSON.stringify(payload));
-//             }
-//         }
-//     }
+    // notify participants
+    payload = payload || {};
+    payload.state = state;
+    this.notifySession(session, {
+      type: "state_change",
+      payload,
+    });
+  }
 
-//     private getWinner(session: CompetitionState): string | null {
-//         let winner = null;
-//         let bestTime = Infinity;
-        
-//         for (const [username, result] of Object.entries(session.results)) {
-//             if (result.penalty === "DNF") continue;
-//             const finalTime = result.penalty === "plus2" ? result.time + 2000 : result.time;
-//             if (finalTime < bestTime) {
-//                 winner = username;
-//                 bestTime = finalTime;
-//             }
-//         }
-//         return winner;
-//     }
+  private notifySession(session: MultiSession, message: MultiServerMessage) {
+    session.participants.forEach(participant => {
+      this.notifyUser(participant, message);
+    });
+  }
 
-//     private async storeSession(session: CompetitionState) {
-//         const participants = Array.from(session.participants);
-        
-//         // Store session
-//         await SessionDB.upsert({
-//             id: session.id,
-//             type: session.type,
-//             player_one: participants[0],
-//             player_two: participants[1],
-//             winner: this.getWinner(session),
-//             cube_type: session.cube_type,
-//         });
+  private notifyPeers(sender: string, message: MultiServerMessage) {
+    const session = this.activeSessions.get(sender);
+    if (!session) return;
+    session.participants.forEach(peer => {
+      if (peer === sender) return;
+      this.notifyUser(peer, message);
+    });
+  }
 
-//         // Store all solves
-//         for (const [username, result] of Object.entries(session.results)) {
-//             await SolveDB.upsert({
-//                 username,
-//                 id: result.id!,
-//                 session_id: session.id,
-//                 scramble: session.scramble,
-//                 time: result.time,
-//                 penalty: result.penalty,
-//             });
-//         }
-//     }
-// }
+  private notifyUser(username: string, message: MultiServerMessage) {
+    const ws = this.connections.get(username);
+    if (!ws) return this.handleDisconnect(username);
+    ws.send(JSON.stringify(message));
+  }
+
+  private forwardMessage(sender: string, message: MultiClientMessage) {
+    const session = this.activeSessions.get(sender);
+    if (!session) return;
+    session.participants.forEach(participant => {
+      if (participant === sender) return;
+      const ws = this.connections.get(participant);
+      if (!ws) return this.handleDisconnect(participant);
+      ws.send(JSON.stringify(message));
+    });
+  }
+
+  //#endregion
+}

@@ -8,6 +8,12 @@ class MockWebSocket {
   onopen: ((event?: MockWebSocketEvent) => void) = () => {};
   onclose: ((event?: MockWebSocketEvent) => void) = () => {};
   onerror: ((event?: MockWebSocketEvent) => void) = () => {};
+  logging = false;
+
+  constructor(logging = false) {
+    this.logging = logging;
+  }
+
 
   // Mock method to add an event listener
   addEventListener(event: string, callback: (event?: MockWebSocketEvent) => void) {
@@ -20,7 +26,7 @@ class MockWebSocket {
   // Mock method to simulate sending a message
   // Messages are stored in reverse order to simulate the actual WebSocket behavior
   send(message: string) {
-    console.log('received message in mock websocket', message)
+    if (this.logging) console.log('received message in mock websocket', message)
     this.sentMessages.unshift(message);
   }
 
