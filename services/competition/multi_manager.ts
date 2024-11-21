@@ -140,7 +140,7 @@ export class MultiManager {
       type: "state_change",
       payload: { state: "queuing" },
     });
-    // Add to queue after notifying user, to not break flow
+    // Add to queue after notifying user, to not break flow as a match can be made instantly and send a reqeust before the user is notified of queuing
     this.queues.addToQueue(username, 0, cube_type);
   }
 

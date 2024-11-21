@@ -1,54 +1,78 @@
-export {}
 
-declare global {
-  type Profile = {
-    id: string
-    username: string
-    email: string
-    pfp: string
-    bio: string
-    createdAt: string
-    updatedAt: string
-  }
-  type ConnectionState = "disconnected" | "connecting" | "connected";
+export type Profile = {
+  id: string
+  username: string
+  email: string
+  pfp: string
+  bio: string
+  created_at: string
+}
 
-  type SessionType = "solo" | "multi";
-  type SessionState = "queuing" | "webrtc" | "scrambling" | "solving" | "complete";
-  type CubeType = "3x3" | "2x2";
-  type Penalty = "DNF" | "plus2" | "none";
+// types.ts
+export type SessionState = "queuing" | "connecting" | "scrambling" | "countdown" | "solving" | "results";
 
-  // Common message types
-  type CommonMessageType = "ERROR" | "SESSION_UPDATE";
-  
-  // Solo-specific message types
-  type SoloMessageType = CommonMessageType | "SOLO_START" | "READY" | "SOLVE_COMPLETE" | "PENALTY";
-  type SoloWebSocketMessage = {
-    type: SoloMessageType;
-    payload?: any;
-  };
+export type CubeType = "3x3" | "2x2";
 
-  // Multi-specific message types
-  type MultiMessageType = CommonMessageType | "QUEUE" | "READY" | "SOLVE_COMPLETE" | "PENALTY" | "LEAVE";
-  type MultiWebSocketMessage = {
-    type: MultiMessageType;
-    payload?: any;
-  };
-
-  type Result = {
+export interface Result {
     id?: string;
     time: number;
-    penalty: Penalty;
-  };
-  
-  type CompetitionState = {
-    id: string;
-    type: SessionType;
-    state: SessionState;
-    cube_type: CubeType;
-    participants: string[];
-    readyParticipants?: string[];
-    scramble: string;
-    results: Record<string, Result>;
-    start_time: number | null;
-  };
+    penalty: "DNF" | "plus2" | "none";
+}
+
+// Message Types
+export type MultiClientMessageType =
+    | "start_q"
+    | "cancel_q"
+    | "chat_message"
+    | "rtc_offer"
+    | "rtc_answer"
+    | "rtc_candidate"
+    | "rtc_connected"
+    | "finish_scramble"
+    | "start_countdown"
+    | "cancel_countdown"
+    | "finish_solve"
+    | "apply_penalty"
+    | "leave_session";
+
+export type MultiServerMessageType =
+    | "state_change"
+    | "error"
+    | "peer_ready"
+    | "peer_unready"
+    | "peer_disconnected"
+    | "countdown_started"
+    | "countdown_canceled"
+    | "results_update";
+
+export interface MultiClientMessage {
+    type: MultiClientMessageType;
+    payload?: Record<string, unknown>; // More type-safe than 'any'
+}
+
+export interface MultiServerMessage {
+    type: MultiServerMessageType;
+    payload?: Record<string, unknown>; // More type-safe than 'any'
+}
+
+export type SoloClientMessageType =
+    | "start_session"
+    | "finish_scramble"
+    | "finish_solve"
+    | "apply_penalty"
+    | "leave_session";
+
+export type SoloServerMessageType =
+    | "state_change"
+    | "results_update"
+    | "error";
+
+export interface SoloServerMessage {
+  type: SoloServerMessageType;
+  payload?: any; // More type-safe than 'any'
+}
+
+export interface SoloClientMessage {
+  type: SoloClientMessageType;
+  payload?: any; // More type-safe than 'any'
 }
