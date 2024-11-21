@@ -24,7 +24,9 @@ Deno.test("Regular multi solve", async (t) => {
       ws1.simulateOpen();
       ws2.simulateOpen();
 
+      // deno-lint-ignore no-explicit-any
       manager.addConnection(username1, (ws1 as any));
+      // deno-lint-ignore no-explicit-any
       manager.addConnection(username2, (ws2 as any));
 
       // Assert
@@ -302,7 +304,7 @@ Deno.test("Regular multi solve", async (t) => {
       assertEquals(readyMessage2.payload.peer, username1);
     });
 
-    await t.step("countdown ends", async () => {
+    await t.step("countdown ends", () => {
       time.tick(3100);
 
       const session = manager.getActiveSessions().get(username1);
@@ -413,7 +415,10 @@ Deno.test("User disconnects in scramble", async (t) => {
       // Connect both users
       ws1.simulateOpen();
       ws2.simulateOpen();
+
+      // deno-lint-ignore no-explicit-any
       manager.addConnection(username1, (ws1 as any));
+      // deno-lint-ignore no-explicit-any
       manager.addConnection(username2, (ws2 as any));
 
       // Start queueing for both users

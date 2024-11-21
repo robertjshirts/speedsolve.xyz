@@ -30,6 +30,7 @@ export const solves = pgTable(
   "solves", 
   {
     solve_id: text().primaryKey(),
+    username: text().notNull().references(() => profiles.username),
     time: integer().notNull(),
     scramble: text().notNull(),
     cube: dbCubeTypes().notNull(),
@@ -38,34 +39,40 @@ export const solves = pgTable(
   },
 );
 
+export type DBSolve = typeof solves.$inferInsert;
+
 export const soloSessions = pgTable(
   "solo_sessions", 
   {
     solo_session_id: text().primaryKey(),
-    participant_id: text().references(() => profiles.id),
     solve_id: text().references(() => solves.solve_id),
     created_at: timestamp().notNull().defaultNow(),
   },
 );
+
+export type DBSoloSession = typeof soloSessions.$inferInsert;
 
 export const multiSessions = pgTable(
   "multi_sessions", 
   {
     multi_session_id: text().primaryKey(),
-    winner_id: text().references(() => profiles.id),
+    winner: text().references(() => profiles.username),
     created_at: timestamp().notNull().defaultNow(),
   },
 );
+
+export type DBMultiSession = typeof multiSessions.$inferInsert;
 
 export const multiSessionSolves = pgTable(
   "multi_session_solves", 
   {
     multi_session_id: text().references(() => multiSessions.multi_session_id),
-    participant_id: text().references(() => profiles.id),
     solve_id: text().references(() => solves.solve_id),
     created_at: timestamp().notNull().defaultNow(),
   }, 
   (t) => [
-    primaryKey({ columns: [t.multi_session_id, t.participant_id, t.solve_id] }),
+    primaryKey({ columns: [t.multi_session_id, t.solve_id] }),
   ],
 );
+
+export type DBMultiSessionSolve = typeof multiSessionSolves.$inferInsert;

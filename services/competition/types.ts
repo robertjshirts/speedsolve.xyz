@@ -61,11 +61,13 @@ type MultiServerMessageType =
 
 export interface MultiClientMessage {
 	type: MultiClientMessageType;
+	// deno-lint-ignore no-explicit-any
 	payload?: Record<string, any>;
 }
 
 export interface MultiServerMessage {
 	type: MultiServerMessageType;
+	// deno-lint-ignore no-explicit-any
 	payload?: Record<string, any>;
 }
 //#endregion
@@ -85,11 +87,13 @@ export type SoloServerMessageType =
 
 export interface SoloServerMessage {
     type: SoloServerMessageType;
+    // deno-lint-ignore no-explicit-any
     payload?: any;
 }
 
 export interface SoloClientMessage {
     type: SoloClientMessageType;
+    // deno-lint-ignore no-explicit-any
     payload?: any;
 }
 //#endregion

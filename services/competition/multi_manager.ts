@@ -1,6 +1,7 @@
 import { generateScramble } from "./scrambler.ts";
 import { SpeedcubeQueue, QueueMatch } from "./speedcube_queue.ts";
 import type { MultiSession, MultiClientMessage, MultiServerMessage, Result, SessionState, CubeType } from "./types.ts";
+import { upsertMultiSession, upsertMultiSessionSolve, upsertSolve } from "./db/db.ts";
 
 export class MultiManager {
   private activeSessions: Map<string, MultiSession> = new Map();
@@ -12,6 +13,29 @@ export class MultiManager {
     this.queues = new SpeedcubeQueue();
     this.queues.addListener("match", this.handleMatchMade.bind(this));
     this.testing = testing;
+    // temporary to test db ops
+    this.saveSession({
+      id: crypto.randomUUID(),
+      cube_type: "3x3",
+      participants: new Set(["shirts", "rob"]),
+      readyParticipants: new Set(),
+      state: "results",
+      scramble: "R U R' U'",
+      results: {
+        shirts: {
+          id: crypto.randomUUID(),
+          time: 1000,
+          penalty: "none",
+        },
+        rob: {
+          id: crypto.randomUUID(),
+          time: 1000,
+          penalty: "plus2",
+        },
+      },
+      start_time: Date.now() - 10000,
+      timeoutId: null,
+    });
   }
 
   cleanup() {
@@ -29,12 +53,12 @@ export class MultiManager {
   }
 
   handleDisconnect(username: string) {
-    this.queues.removeFromQueue(username, this.activeSessions.get(username)!.cube_type);
+    const session = this.activeSessions.get(username);
     this.connections.delete(username);
 
-    const session = this.activeSessions.get(username);
     if (!session) return;
 
+    this.queues.removeFromQueue(username, session.cube_type);
     this.notifyPeers(username, {
       type: "peer_disconnected",
       payload: { peer: username },
@@ -287,7 +311,7 @@ export class MultiManager {
     });
   }
 
-  private finishSolve(username: string, time: number) {
+  private async finishSolve(username: string, time: number) {
     // Check state
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "solving") {
@@ -315,14 +339,14 @@ export class MultiManager {
     session.results[username] = result;
     this.readyPeer(username);
     if (session.readyParticipants.size === session.participants.size) {
-      // TODO: store results in db
+      await this.saveSession(session);
       this.changeState(session, "results", {
         results: session.results,
       });
     }
   }
 
-  private applyPenalty(username: string, penalty: "none" | "DNF" | "plus2" = "none") {
+  private async applyPenalty(username: string, penalty: "none" | "DNF" | "plus2" = "none") {
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "results") {
       this.notifyUser(username, {
@@ -337,7 +361,7 @@ export class MultiManager {
 
     // apply penalty
     session.results[username].penalty = penalty; 
-    // TODO: store results in db
+    await this.saveSession(session);
 
     this.notifySession(session, {
       type: "results_update",
@@ -346,6 +370,73 @@ export class MultiManager {
   }
 
   //#region Helper functions
+  private async saveSession(session: MultiSession) {
+    // Skip saving in testing
+    if (this.testing) return;
+
+    // Insert multi session so we can relate the solves to it
+    const winner = this.determineWinner(session);
+    try {
+      await upsertMultiSession({
+        multi_session_id: session.id,
+        winner: winner,
+      });
+
+      // Insert solves and relate to multi session
+      for (const [username, result] of Object.entries(session.results)) {
+        // Insert solve
+        await upsertSolve({
+          solve_id: result.id!,
+          username: username,
+          time: result.time,
+          penalty: result.penalty,
+          scramble: session.scramble,
+          cube: session.cube_type,
+        });
+
+        // Relate solve to multi session
+        await upsertMultiSessionSolve({
+          multi_session_id: session.id,
+          solve_id: result.id!,
+        });
+      }
+    } catch (error) {
+      console.error(error);
+      this.notifySession(session, {
+        type: "error",
+        payload: { message: "Failed to save session." },
+      });
+    }
+  }
+
+  private determineWinner(session: MultiSession) {
+    let lowest_time = Infinity;
+    let winner_username = "";
+    for (const [username, result] of Object.entries(session.results)) {
+      if (result.time < lowest_time) {
+        switch (result.penalty) {
+          case "none":
+            lowest_time = result.time;
+            winner_username = username;
+            break;
+          case "plus2":
+            if (lowest_time < result.time + 2000) {
+              lowest_time = result.time + 2000;
+              winner_username = username;
+            }
+            break;
+          case "DNF":
+            if (lowest_time === Infinity) {
+              lowest_time = result.time;
+              winner_username = username;
+            }
+            break;
+        }
+      }
+    }
+    return winner_username;
+  }
+
   private readyPeer(username: string) {
     const session = this.activeSessions.get(username);
     if (!session) return;
@@ -356,6 +447,7 @@ export class MultiManager {
     });
   }
 
+  // deno-lint-ignore no-explicit-any
   private changeState(session: MultiSession, state: SessionState, payload?: Record<string, any>) {
     // change session
     session.readyParticipants.clear();
