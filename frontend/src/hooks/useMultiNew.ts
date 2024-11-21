@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useWebRTC } from './useWebRTC';
-import { PeerStatus, CubeType, Result, SessionState, MultiServerMessage, MultiClientMessageType } from '../types';
+import { RTCStatus, WSStatus, PeerStatus, CubeType, Result, SessionState, MultiServerMessage, MultiClientMessageType } from '../types';
 
 // Maybe make a peer info object with profile later
 
@@ -10,16 +10,18 @@ interface CompetitionState {
   scramble?: string;
   results: Record<string, Result>;
   peers: Record<string, PeerStatus>;
+  rtcStatus: RTCStatus;
   error?: string;
 }
 
 interface UseMultiCompetitionReturn {
   state: CompetitionState;
-  connectionState: 'disconnected' | 'connecting' | 'connected';
+  wsStatus: WSStatus;
   actions: {
     retryConnection: () => void;
     startQueue: (cubeType: CubeType) => void;
     cancelQueue: () => void;
+    rtcConnected: () => void;
     finishScramble: () => void;
     startCountdown: () => void;
     cancelCountdown: () => void;
@@ -30,16 +32,18 @@ interface UseMultiCompetitionReturn {
 }
 
 export function useMultiNew(): UseMultiCompetitionReturn {
-  const [connectionState, setConnectionState] = useState<'disconnected' | 'connecting' | 'connected'>('disconnected');
   const [state, setState] = useState<CompetitionState>({
     mainState: null,
     results: {},
-    peers: {}
+    peers: {},
+    rtcStatus: 'disconnected'
   });
   const [username, setUsername] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const [wsStatus, setWsStatus] = useState<WSStatus>('disconnected');
   const { getAccessTokenSilently, user } = useAuth0();
 
+  // Username effect (move to hook and global state)
   useEffect(() => {
     if (user?.username) {
       setUsername(user.username!);
@@ -53,16 +57,17 @@ export function useMultiNew(): UseMultiCompetitionReturn {
     }
   }, [user, state.mainState])
 
+  // Define cleanup
   const cleanup = useCallback(() => {
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
     }
-    setConnectionState('disconnected');
     setState({
       mainState: null,
       results: {},
-      peers: {}
+      peers: {},
+      rtcStatus: 'disconnected'
     });
   }, []);
 
@@ -71,11 +76,21 @@ export function useMultiNew(): UseMultiCompetitionReturn {
       console.error('WebSocket is not connected');
       return;
     }
+    if (type === 'rtc_offer' || type === 'rtc_answer' || type === 'rtc_candidate') {
+      setState(prev => ({ ...prev, rtc: 'connecting' }));
+    }
+    // Send message
     wsRef.current.send(JSON.stringify({ type, payload }));
   }, []);
 
-  const { startConnection, handleRTCMessage } = useWebRTC(sendMessage);
+  // WebRTC
+  const { startConnection, handleRTCMessage, rtcStatus } = useWebRTC(sendMessage);
+  // Effect to update rtcStatus in state
+  useEffect(() => {
+    setState(prev => ({ ...prev, rtcStatus }));
+  }, [rtcStatus]);
 
+  // Handle messages
   const handleServerMessage = useCallback((message: MultiServerMessage) => {
     switch (message.type) {
       case 'state_change': {
@@ -148,7 +163,8 @@ export function useMultiNew(): UseMultiCompetitionReturn {
             peers: {
               ...prev.peers,
               [peer]: 'peer_disconnected'
-            }
+            },
+            rtc: 'disconnected'
           }
         });
         break;
@@ -200,10 +216,10 @@ export function useMultiNew(): UseMultiCompetitionReturn {
       const wsUrl = `${wsProtocol}://${apiUrl}/competition/ws/multi?token=${token}`;
       
       wsRef.current = new WebSocket(wsUrl);
-      setConnectionState('connecting');
+      ('connecting');
 
       wsRef.current.onopen = () => {
-        setConnectionState('connected');
+        setWsStatus('connected');
         setState(prev => ({ ...prev, error: undefined }));
       };
 
@@ -242,6 +258,7 @@ export function useMultiNew(): UseMultiCompetitionReturn {
     retryConnection: initialize,
     startQueue: (cubeType: CubeType) => sendMessage('start_q', { cube_type: cubeType }),
     cancelQueue: () => sendMessage('cancel_q'),
+    rtcConnected: () => sendMessage('rtc_connected'),
     finishScramble: () => sendMessage('finish_scramble'),
     startCountdown: () => sendMessage('start_countdown'),
     cancelCountdown: () => sendMessage('cancel_countdown'),
@@ -252,10 +269,11 @@ export function useMultiNew(): UseMultiCompetitionReturn {
       setState({
         mainState: null,
         results: {},
-        peers: {}
+        peers: {},
+        rtcStatus: 'disconnected'
       });
     }
   };
 
-  return { state, connectionState, actions };
+  return { state, wsStatus, actions };
 }

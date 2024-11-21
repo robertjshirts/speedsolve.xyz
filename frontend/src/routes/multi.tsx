@@ -17,14 +17,14 @@ export const Route = createFileRoute('/multi')({
 
 function RouteComponent() {
   const { isAuthenticated, loginWithRedirect } = useAuth0();
-  const { state, connectionState, actions } = useMultiNew();
+  const { state, wsStatus, actions } = useMultiNew();
 
   if (!isAuthenticated) {
     return <Login />;
   }
 
   const renderMainContent = () => {
-    if (connectionState === 'disconnected') {
+    if (wsStatus === 'disconnected') {
       return (
         <div className="flex flex-col items-center justify-center h-[60vh]">
           <button
@@ -36,7 +36,7 @@ function RouteComponent() {
         </div>
       );
     }
-    if (connectionState === 'connecting') {
+    if (wsStatus === 'connecting') {
       return (
         <div className="flex flex-col items-center justify-center h-[60vh]">
           <div className="w-12 h-12 border-4 border-skin-accent border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -100,10 +100,10 @@ function RouteComponent() {
             <div className="w-12 h-12 border-4 border-skin-accent border-t-transparent rounded-full animate-spin mb-4"></div>
             <p className="text-xl text-skin-base">Connecting to opponent...</p>
             <button
-              onClick={actions.sendRTCConnected}
+              onClick={actions.rtcConnected}
               className="mt-4 bg-green-500 text-white px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
             >
-              Connect RTC
+              Skip WebRTC
             </button>
           </div>
         );
@@ -185,8 +185,9 @@ function RouteComponent() {
   // Debug panel for development
   const renderDebugPanel = () => (
     <div className="fixed bottom-4 left-4 bg-gray-800 text-white p-4 rounded-lg opacity-75 hover:opacity-100 transition-opacity">
-      <div>Connection: {connectionState}</div>
+      <div>Connection: {wsStatus}</div>
       <div>State: {state.mainState || 'not started'}</div>
+      <div>RTC: {state.rtcStatus}</div>
       <div>
         Peers:{' '}
         {Object.entries(state.peers).map(([username, status]) => (
