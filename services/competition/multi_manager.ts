@@ -212,13 +212,13 @@ export class MultiManager {
 
   private handleRtcConnected(username: string) {
     const session = this.activeSessions.get(username);
-    if (!session || session.state !== "connecting") {
-      logger.warn("Invalid RTC connection attempt", { username, sessionState: session?.state });
-      this.notifyUser(username, {
-        type: "error",
-        payload: { message: "Not in connecting state. Cannot connect to peer." },
-      });
+    if (!session) {
+      logger.error("RTC connection without active session", { username });
       return;
+    }
+
+    if (session.state !== "connecting") {
+      logger.warn("Invalid RTC connection attempt", { username, sessionState: session?.state });
     }
 
     logger.debug("RTC connected", { username, sessionId: session.id });
