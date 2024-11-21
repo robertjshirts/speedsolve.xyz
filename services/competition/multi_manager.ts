@@ -39,6 +39,7 @@ export class MultiManager {
     logger.info("New connection added", { username });
   }
 
+
   handleDisconnect(username: string) {
     const session = this.activeSessions.get(username);
     const ws = this.connections.get(username);
@@ -90,7 +91,7 @@ export class MultiManager {
         break;
       case "cancel_q":
       case "leave_session":
-        this.handleDisconnect(username);
+        this.endSession(username);
         break;
       case "rtc_connected":
         this.handleRtcConnected(username);
@@ -386,6 +387,25 @@ export class MultiManager {
     });
   }
 
+  private endSession(username: string) {
+    const session = this.activeSessions.get(username);
+    if (!session) return;
+    this.queues.removeFromQueue(username, session.cube_type);
+    this.activeSessions.delete(username);
+
+    logger.info("Session ended", { 
+      username, 
+      sessionId: session.id, 
+      participants: Array.from(session.participants) 
+    });
+
+    // TODO: Graceful session end if not in results state. handled by frontend for now, should be handled here too/instead
+    this.notifyPeers(username, {
+      type: "peer_disconnected",
+      payload: { peer: username },
+    });
+  }
+
   //#region Helper functions
   private async saveSession(session: MultiSession) {
     if (this.testing) return;
@@ -420,7 +440,7 @@ export class MultiManager {
     } catch (error) {
       logger.error("Failed to save session", { 
         sessionId: session.id, 
-        error 
+        error,
       });
       this.notifySession(session, {
         type: "error",
@@ -440,7 +460,7 @@ export class MultiManager {
             winner_username = username;
             break;
           case "plus2":
-            if (lowest_time < result.time + 2000) {
+            if (result.time + 2000 < lowest_time) {
               lowest_time = result.time + 2000;
               winner_username = username;
             }
@@ -454,6 +474,7 @@ export class MultiManager {
         }
       }
     }
+    logger.info("Winner determined", { sessionId: session.id, winner: winner_username, participants: Array.from(session.participants) });
     return winner_username;
   }
 

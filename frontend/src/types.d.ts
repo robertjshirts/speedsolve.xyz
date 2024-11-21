@@ -45,7 +45,10 @@ export type MultiServerMessageType =
     | "peer_disconnected"
     | "countdown_started"
     | "countdown_canceled"
-    | "results_update";
+    | "results_update"
+    | "rtc_offer"
+    | "rtc_answer"
+    | "rtc_candidate";
 
 export interface MultiClientMessage {
     type: MultiClientMessageType;

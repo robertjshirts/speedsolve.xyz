@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { useWebRTC } from './useWebRTC';
 import { PeerStatus, CubeType, Result, SessionState, MultiServerMessage, MultiClientMessageType } from '../types';
 
 // Maybe make a peer info object with profile later
@@ -19,8 +20,6 @@ interface UseMultiCompetitionReturn {
     retryConnection: () => void;
     startQueue: (cubeType: CubeType) => void;
     cancelQueue: () => void;
-    sendRTCSignal: (type: 'offer' | 'answer' | 'candidate', payload: any) => void;
-    sendRTCConnected: () => void;
     finishScramble: () => void;
     startCountdown: () => void;
     cancelCountdown: () => void;
@@ -52,7 +51,7 @@ export function useMultiNew(): UseMultiCompetitionReturn {
         )
       }));
     }
-  }, [user])
+  }, [user, state.mainState])
 
   const cleanup = useCallback(() => {
     if (wsRef.current) {
@@ -67,7 +66,7 @@ export function useMultiNew(): UseMultiCompetitionReturn {
     });
   }, []);
 
-  const sendMessage = useCallback((type: MultiClientMessageType, payload?: any) => {
+  const sendMessage = useCallback((type: MultiClientMessageType, payload?: Record<string, any>) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.error('WebSocket is not connected');
       return;
@@ -75,10 +74,12 @@ export function useMultiNew(): UseMultiCompetitionReturn {
     wsRef.current.send(JSON.stringify({ type, payload }));
   }, []);
 
+  const { startConnection, handleRTCMessage } = useWebRTC(sendMessage);
+
   const handleServerMessage = useCallback((message: MultiServerMessage) => {
     switch (message.type) {
       case 'state_change': {
-        const payload = message.payload as { state: SessionState; scramble?: string; results?: Record<string, Result>; peers?: string[] };
+        const payload = message.payload as { state: SessionState; scramble?: string; results?: Record<string, Result>; peers?: string[]; isOfferer?: boolean };
         if (!payload) return console.error("No payload in message of type 'state_change'");
         // make new peers object
         const newPeers: Record<string, PeerStatus> = {};
@@ -97,6 +98,9 @@ export function useMultiNew(): UseMultiCompetitionReturn {
           // Peers are also reset on state_change
           peers: newPeers
         }));
+        if (payload.state === 'connecting') {
+          startConnection(payload.isOfferer || false);
+        }
         break;
       }
 
@@ -158,6 +162,13 @@ export function useMultiNew(): UseMultiCompetitionReturn {
           ...prev,
           results
         }));
+        break;
+      }
+
+      case 'rtc_offer':
+      case 'rtc_answer':
+      case 'rtc_candidate': {
+        handleRTCMessage(message.type, message.payload);
         break;
       }
 
@@ -231,9 +242,6 @@ export function useMultiNew(): UseMultiCompetitionReturn {
     retryConnection: initialize,
     startQueue: (cubeType: CubeType) => sendMessage('start_q', { cube_type: cubeType }),
     cancelQueue: () => sendMessage('cancel_q'),
-    sendRTCSignal: (type: 'offer' | 'answer' | 'candidate', payload: any) => 
-      sendMessage(`rtc_${type}` as MultiClientMessageType, payload),
-    sendRTCConnected: () => sendMessage('rtc_connected'),
     finishScramble: () => sendMessage('finish_scramble'),
     startCountdown: () => sendMessage('start_countdown'),
     cancelCountdown: () => sendMessage('cancel_countdown'),
@@ -241,7 +249,11 @@ export function useMultiNew(): UseMultiCompetitionReturn {
     applyPenalty: (penalty: "none" | "DNF" | "plus2") => sendMessage('apply_penalty', { penalty }),
     leaveSession: () => {
       sendMessage('leave_session');
-      cleanup();
+      setState({
+        mainState: null,
+        results: {},
+        peers: {}
+      });
     }
   };
 
