@@ -1,5 +1,15 @@
 type MockWebSocketEvent = MessageEvent | Event | Error;
 
+export interface MockWebSocketOptions {
+  enableLogging?: boolean;
+  enableMessageTracking?: boolean;
+}
+
+const DEFAULT_OPTIONS: Required<MockWebSocketOptions> = {
+  enableLogging: false,
+  enableMessageTracking: true,
+}
+
 class MockWebSocket {
   events: Record<string, ((event?: MockWebSocketEvent) => void)[]> = {};
   receivedMessages: string[] = [];
@@ -8,12 +18,14 @@ class MockWebSocket {
   onopen: ((event?: MockWebSocketEvent) => void) = () => {};
   onclose: ((event?: MockWebSocketEvent) => void) = () => {};
   onerror: ((event?: MockWebSocketEvent) => void) = () => {};
-  logging = false;
+  private readonly options: Required<MockWebSocketOptions>;
 
-  constructor(logging = false) {
-    this.logging = logging;
+  constructor(options: MockWebSocketOptions = {}) {
+    this.options = {
+      ...DEFAULT_OPTIONS,
+      ...options
+    }
   }
-
 
   // Mock method to add an event listener
   addEventListener(event: string, callback: (event?: MockWebSocketEvent) => void) {
@@ -26,8 +38,8 @@ class MockWebSocket {
   // Mock method to simulate sending a message
   // Messages are stored in reverse order to simulate the actual WebSocket behavior
   send(message: string) {
-    if (this.logging) console.log('received message in mock websocket', message)
-    this.sentMessages.unshift(message);
+    if (this.options.enableLogging) console.log('received message in mock websocket', message)
+    if (this.options.enableMessageTracking) this.sentMessages.unshift(message);
   }
 
   // Mock method to simulate receiving a message

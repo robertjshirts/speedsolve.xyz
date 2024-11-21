@@ -9,20 +9,6 @@ export class SoloManager {
 
   constructor(testing = false) {
     this.testing = testing;
-    // only for testing db ops
-    this.saveSession({
-      id: crypto.randomUUID(),
-      state: "results",
-      cube_type: "3x3",
-      participant: "shirts",
-      scramble: "R U R' U'",
-      start_time: Date.now() - 1000,
-      result: {
-        id: crypto.randomUUID(),
-        time: 1000,
-        penalty: "none",
-      }
-    })
   }
 
   addConnection(username: string, ws: WebSocket) {

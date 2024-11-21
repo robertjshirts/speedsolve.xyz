@@ -13,29 +13,6 @@ export class MultiManager {
     this.queues = new SpeedcubeQueue();
     this.queues.addListener("match", this.handleMatchMade.bind(this));
     this.testing = testing;
-    // temporary to test db ops
-    this.saveSession({
-      id: crypto.randomUUID(),
-      cube_type: "3x3",
-      participants: new Set(["shirts", "rob"]),
-      readyParticipants: new Set(),
-      state: "results",
-      scramble: "R U R' U'",
-      results: {
-        shirts: {
-          id: crypto.randomUUID(),
-          time: 1000,
-          penalty: "none",
-        },
-        rob: {
-          id: crypto.randomUUID(),
-          time: 1000,
-          penalty: "plus2",
-        },
-      },
-      start_time: Date.now() - 10000,
-      timeoutId: null,
-    });
   }
 
   cleanup() {
@@ -268,6 +245,9 @@ export class MultiManager {
       this.notifySession(session, {
         type: "countdown_started",
       });
+      if (this.testing) {
+        this.handleStartSolving(session);
+      }
       // Start solving after 3 seconds
       session.timeoutId = setTimeout(() => {
         this.handleStartSolving(session);
