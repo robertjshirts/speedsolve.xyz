@@ -2,10 +2,6 @@ import { generateScramble } from "./scrambler.ts";
 import { SpeedcubeQueue, QueueMatch } from "./speedcube_queue.ts";
 import type { MultiSession, MultiClientMessage, MultiServerMessage, Result, SessionState, CubeType } from "./types.ts";
 
-import Database from "./models.ts";
-
-
-
 export class MultiManager {
   private activeSessions: Map<string, MultiSession> = new Map();
   private connections: Map<string, WebSocket> = new Map();

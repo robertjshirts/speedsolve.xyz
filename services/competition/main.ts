@@ -2,9 +2,6 @@ import "dotenv";
 import { Application } from "oak";
 
 import router from "./websocket.ts";
-import Database from "./models.ts";
-
-await Database.initialize();
 
 const app = new Application();
 

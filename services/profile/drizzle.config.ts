@@ -9,6 +9,4 @@ export default defineConfig({
 	dbCredentials: {
 		url: process.env.PGURL!,
 	},
-  strict: true,
-  verbose: true,
 });

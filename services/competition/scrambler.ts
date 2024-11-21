@@ -1,3 +1,5 @@
+import { CubeType } from "./types.ts";
+
 export function generateScramble(cube_type: CubeType): string {
 	if (
 		cube_type === "3x3" ||
