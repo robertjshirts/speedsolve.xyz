@@ -12,10 +12,34 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
 
   const createPeerConnection = useCallback((isOfferer: boolean) => {
     console.log('creating peer connection');
+    const turnUsername = import.meta.env.VITE_TURN_USERNAME!;
+    const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL!;
     const pc = new RTCPeerConnection({
       iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-      ]
+        {
+          urls: "stun:stun.l.google.com:19302",
+        },
+        // {
+        //   urls: "turn:global.relay.metered.ca:80",
+        //   username: turnUsername,
+        //   credential: turnCredential,
+        // },
+        // {
+        //   urls: "turn:global.relay.metered.ca:80?transport=tcp",
+        //   username: turnUsername,
+        //   credential: turnCredential,
+        // },
+        // {
+        //   urls: "turn:global.relay.metered.ca:443",
+        //   username: turnUsername,
+        //   credential: turnCredential,
+        // },
+        // {
+        //   urls: "turns:global.relay.metered.ca:443?transport=tcp",
+        //   username: turnUsername,
+        //   credential: turnCredential,
+        // },
+      ], 
     });
 
     const channel = pc.createDataChannel('dataChannel');
@@ -45,6 +69,7 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
         // TODO: remove console.log
         console.log('received offer', payload);
         await pc.setRemoteDescription(payload);
+        console.log('creating answer');
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         sendMessage('rtc_answer', answer);
