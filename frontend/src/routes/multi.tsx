@@ -201,7 +201,7 @@ function RouteComponent() {
   return (
     <div className="container mx-auto px-4 py-8">
       {renderMainContent()}
-      {import.meta.env.DEV && renderDebugPanel()}
+      {renderDebugPanel()}
     </div>
   );
 }
