@@ -42,8 +42,9 @@ export async function verifyAndParseJWT(
 			return;
 		}
 
-		// Store username in context. Persists through request.
+		// Store username and user_id in context. Persists through request.
 		ctx.state.username = payload["https://speedsolve.xyz/username"];
+		ctx.state.user_id = payload.sub;
 
 		await next();
 	} catch (error) {

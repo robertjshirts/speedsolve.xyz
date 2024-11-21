@@ -26,6 +26,8 @@ services:
       - "traefik.http.routers.dashboard-router.middlewares=auth"
   profile:
     build: ./services/profile/
+    ports: 
+      - "8001:8000"
     container_name: profile
     labels:
       - "traefik.enable=true"

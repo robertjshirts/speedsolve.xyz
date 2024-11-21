@@ -1,11 +1,11 @@
 import { RouterContext } from "oak";
 import { ProfilePostBody } from "./validation.ts";
-import * as db from "./models.ts";
+import * as db from "./db/db.ts";
 import { STATUS_CODE } from "status";
 
 export const ProfilePostHandler = async (ctx: RouterContext<"/profile">) => {
 	const body: ProfilePostBody = ctx.state.validatedBody;
-	const { usernameTaken, emailTaken } = await db.isUsernameOrEmailTaken(
+	const { usernameTaken, emailTaken } = await db.checkProfileUsernameEmail(
 		body.username,
 		body.email,
 	);
@@ -22,14 +22,28 @@ export const ProfilePostHandler = async (ctx: RouterContext<"/profile">) => {
 	}
 
 	try {
-		const profile = await db.ProfileDB.create(body);
+		const profile = await db.insertProfile(body);
 		ctx.response.status = STATUS_CODE.Created;
-		ctx.response.body = profile.toJSON();
+		ctx.response.body = profile;
 		return;
 	} catch (e) {
 		ctx.response.status = STATUS_CODE.InternalServerError;
 		ctx.response.body = {
 			error: "An error occured while creating the profile",
+			details: e,
+		};
+	}
+};
+
+export const ProfileGetAllHandler = async (ctx: RouterContext<"/profile">) => {
+	try {
+		const profiles = await db.getProfiles();
+		ctx.response.status = STATUS_CODE.OK;
+		ctx.response.body = profiles;
+	} catch (e) {
+		ctx.response.status = STATUS_CODE.InternalServerError;
+		ctx.response.body = {
+			error: "An error occurred while getting all profiles",
 			details: e,
 		};
 	}
@@ -47,24 +61,22 @@ export const ProfileGetHandler = async (
 	const username = ctx.params.username;
 
 	try {
-		const profile = await db.ProfileDB.findOne({
-			where: {
-				username: username,
-			},
-		});
+		const profile = await db.getProfile(username);
 
 		if (profile) {
 			ctx.response.status = STATUS_CODE.OK;
-			ctx.response.body = profile.toJSON();
+			ctx.response.body = profile;
 			return;
 		} else {
 			ctx.response.status = STATUS_CODE.NotFound;
 			ctx.response.body = { error: "No profile found" };
 		}
 	} catch (e) {
-		console.log("error fetching profile", e);
 		ctx.response.status = STATUS_CODE.InternalServerError;
-		ctx.response.body = String(e);
+		ctx.response.body = {
+			error: "An error occurred while getting the profile",
+			details: e,
+		};
 	}
 };
 
@@ -77,8 +89,8 @@ export const ProfilePutHandler = async (
 		return;
 	}
 
+	// Get the username and body from the request
 	const username = ctx.params.username;
-
 	const body = ctx.state.validatedBody;
 	if (!body) {
 		ctx.response.status = STATUS_CODE.BadRequest;
@@ -87,20 +99,18 @@ export const ProfilePutHandler = async (
 	}
 
 	try {
-		let profile = await db.ProfileDB.findOne({
-			where: {
-				username: username,
-			},
-		});
-
+		// Get the profile from the database to ensure it exists
+		const profile = await db.getProfile(username);
 		if (!profile) {
 			ctx.response.status = STATUS_CODE.NotFound;
+			ctx.response.body = "Profile not found";
 			return;
 		}
 
-		profile = await profile.update(body);
+		// Update the profile
+		const updatedProfile = await db.updateProfile(username, body);
 		ctx.response.status = STATUS_CODE.OK;
-		ctx.response.body = profile?.toJSON();
+		ctx.response.body = updatedProfile;
 	} catch (e) {
 		console.log("error updating profile", e);
 		ctx.response.status = STATUS_CODE.InternalServerError;
@@ -120,20 +130,27 @@ export const ProfileDeleteHandler = async (
 		return;
 	}
 
+	// Get the username from the path
 	const username = ctx.params.username;
 
-	const profile = await db.ProfileDB.findOne({
-		where: {
-			username: username,
-		},
-	});
+	try {
+		// Get the profile from the database to ensure it exists
+		const profile = await db.getProfile(username);
+		if (!profile) {
+			ctx.response.status = STATUS_CODE.NotFound;
+			ctx.response.body = "Profile not found";
+			return;
+		}
 
-	if (!profile) {
-		ctx.response.status = STATUS_CODE.NotFound;
-		ctx.response.body = "Profile not found";
-		return;
+		// Delete the profile
+		await db.deleteProfile(username);
+		ctx.response.status = STATUS_CODE.NoContent;
+	} catch (e) {
+		console.log("error deleting profile", e);
+		ctx.response.status = STATUS_CODE.InternalServerError;
+		ctx.response.body = {
+			error: "An error occurred while deleting the profile",
+			details: e,
+		};
 	}
-
-	await profile?.destroy();
-	ctx.response.status = STATUS_CODE.NoContent;
 };

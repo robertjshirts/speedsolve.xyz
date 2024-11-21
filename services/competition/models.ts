@@ -21,6 +21,42 @@ class Database {
 
 	static defineModels() {
 		const sequelize = this.getInstance();
+		const ProfileDB = sequelize.define(
+			"profile",
+			{
+				id: {
+					type: DataTypes.STRING,
+					primaryKey: true,
+				},
+				username: {
+					type: DataTypes.STRING,
+					allowNull: false,
+					unique: true,
+				},
+				email: {
+					type: DataTypes.STRING,
+					unique: true,
+					allowNull: false,
+					validate: {
+						isEmail: true,
+					},
+				},
+				bio: {
+					type: DataTypes.TEXT,
+					allowNull: true,
+				},
+				pfp: {
+					type: DataTypes.STRING,
+					allowNull: true,
+					defaultValue:
+						"https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Default_pfp.svg/2048px-Default_pfp.svg.png",
+				},
+			},
+			{
+				timestamps: true,
+				underscored: true,
+			},
+		);
 		const SolveDB = sequelize.define(
 			"solve",
 			{
@@ -30,16 +66,8 @@ class Database {
 					allowNull: false,
 					defaultValue: DataTypes.UUIDV4,
 				},
-				username: {
-					type: DataTypes.STRING,
-					allowNull: false,
-				},
 				scramble: {
 					type: DataTypes.STRING,
-					allowNull: false,
-				},
-				type: {
-					type: DataTypes.ENUM("solo", "multi"),
 					allowNull: false,
 				},
 				time: {
@@ -59,36 +87,37 @@ class Database {
 			{
 				timestamps: true,
 				underscored: true,
-				indexes: [
-					{ unique: false, fields: ["username"] },
-				],
 			},
 		);
-		const CompetitionDB = sequelize.define(
-			"competition",
+		const MultiSessionDB = sequelize.define(
+			"multi_session",
 			{
-				id: {
+				session_id: {
 					type: DataTypes.UUID,
 					primaryKey: true,
 					allowNull: false,
 					defaultValue: DataTypes.UUIDV4,
 				},
-				winner: {
+				winner_id: {
 					type: DataTypes.STRING,
 					allowNull: false,
+					references: {
+						model: SolveDB,
+						key: "solve_id",
+					},
 				},
 			},
 		);
-		const ParticipantsDB = sequelize.define(
-			"participants",
+		const MultiSessionSolvesDB = sequelize.define(
+			"multi_session_solves",
 			{
-				competition_id: {
+				session_id: {
 					type: DataTypes.UUID,
 					allowNull: false,
 					primaryKey: true,
 					references: {
-						model: CompetitionDB,
-						key: "id",
+						model: MultiSessionDB,
+						key: "session_id",
 					},
 				},
 				solve_id: {
@@ -100,24 +129,18 @@ class Database {
 						key: "solve_id",
 					},
 				},
-				participant: {
+				participant_id: {
 					type: DataTypes.STRING,
 					allowNull: false,
+					primaryKey: true,
+					references: {
+						model: ProfileDB,
+						key: "id",
+					},
 				},
 			},
-			{
-				timestamps: true,
-				underscored: true,
-				indexes: [
-					{ unique: false, fields: ["competition_id"] },
-					{ unique: false, fields: ["solve_id"] },
-					{ unique: false, fields: ["participant"] },
-				],
-			}
-		);
-
-		// TODO: add relationships
-		CompetitionDB.hasMany(ParticipantsDB);
+		)
+		return { ProfileDB, SolveDB, MultiSessionDB, MultiSessionSolvesDB };
 	}
 
 	static async initialize(): Promise<void> {
@@ -127,10 +150,13 @@ class Database {
 			console.log("Connection has been established successfully.");
 
 			// Define models
-			this.defineModels();
+			const { ProfileDB, SolveDB, MultiSessionDB, MultiSessionSolvesDB } = this.defineModels();
 			// Sync models
+			await ProfileDB.sync();
 			// TODO: remove force after finalizing schema
-			await sequelize.sync({ force: true });
+			await SolveDB.sync({ force: true });
+			await MultisessionDB.sync({ force: true });
+			await ParticipantsDB.sync({ force: true });
 		} catch (error) {
 			console.error("Unable to connect to the database:", error);
 			Deno.exit(1);

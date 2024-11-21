@@ -8,14 +8,14 @@ export const ProfilePostBody = z.object({
 	email: z.string().email(),
 	bio: z.string().max(1000).optional(),
 	pfp: z.string().url().optional(),
-});
+}).strip();
 
 export type ProfilePostBody = z.infer<typeof ProfilePostBody>;
 
 export const ProfileUpdateBody = z.object({
 	bio: z.string().optional(),
 	pfp: z.string().url().optional(),
-});
+}).strip();
 
 export type ProfileUpdateBody = z.infer<typeof ProfileUpdateBody>;
 

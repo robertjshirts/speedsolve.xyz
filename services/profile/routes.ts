@@ -15,6 +15,11 @@ router.post(
 );
 
 router.get(
+	"/profile",
+	h.ProfileGetAllHandler,
+);
+
+router.get(
 	"/profile/:username",
 	h.ProfileGetHandler,
 );
