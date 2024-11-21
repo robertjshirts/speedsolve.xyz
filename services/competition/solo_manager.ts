@@ -1,6 +1,7 @@
 import { generateScramble } from "./scrambler.ts";
 import type { CubeType, SoloSession, SoloClientMessage, SoloServerMessage, Result, SessionState } from "./types.ts";
 import { upsertSoloSession, upsertSolve } from "./db/db.ts";
+import { logger } from "./logger.ts";
 
 export class SoloManager {
   private activeSessions: Map<string, SoloSession> = new Map();
@@ -9,6 +10,7 @@ export class SoloManager {
 
   constructor(testing = false) {
     this.testing = testing;
+    logger.info("SoloManager initialized", { testing });
   }
 
   addConnection(username: string, ws: WebSocket) {
@@ -17,11 +19,14 @@ export class SoloManager {
     ws.onmessage = (event) => this.handleMessage(username, event);
     ws.onclose = () => this.handleDisconnect(username);
     ws.onerror = () => this.handleDisconnect(username);
+    logger.info("New connection added", { username });
   }
 
   handleDisconnect(username: string) {
+    const hadSession = this.activeSessions.has(username);
     this.activeSessions.delete(username);
     this.connections.delete(username);
+    logger.info("User disconnected", { username, hadActiveSession: hadSession });
   }
 
   getActiveSessions() {
@@ -30,9 +35,12 @@ export class SoloManager {
 
   private handleMessage(username: string, event: MessageEvent) {
     const message = JSON.parse(event.data as string) as SoloClientMessage;
+    logger.debug("Received message", { username, messageType: message.type });
+
     switch (message.type) {
       case "start_session":
         if (!message.payload?.cube_type) {
+          logger.warn("Invalid start_session message - missing cube_type", { username });
           this.notifyUser(username, {
             type: "error",
             payload: "No cube_type provided",
@@ -46,6 +54,7 @@ export class SoloManager {
         break;
       case "finish_solve": 
         if (!message.payload?.time) {
+          logger.warn("Invalid finish_solve message - missing time", { username });
           this.notifyUser(username, {
             type: "error",
             payload: "No time provided",
@@ -56,6 +65,7 @@ export class SoloManager {
         break;
       case "apply_penalty": 
         if (!message.payload?.penalty) {
+          logger.warn("Invalid apply_penalty message - missing penalty", { username });
           this.notifyUser(username, {
             type: "error",
             payload: "No penalty provided",
@@ -64,7 +74,15 @@ export class SoloManager {
         }
         this.handlePenalty(username, message.payload.penalty); 
         break;
-      case "leave_session": this.handleDisconnect(username); break;
+      case "leave_session": 
+        this.handleDisconnect(username); 
+        break;
+      default:
+        logger.warn("Invalid message type", { username, messageType: message.type });
+        this.notifyUser(username, {
+          type: "error",
+          payload: "Invalid message type",
+        });
     }
   }
 
@@ -80,6 +98,11 @@ export class SoloManager {
     };
 
     this.activeSessions.set(username, session);
+    logger.info("Solo session started", { 
+      username, 
+      sessionId: session.id,
+      cubeType: cube_type 
+    });
 
     this.changeState(session, "scrambling", {
       scramble: session.scramble,
@@ -89,6 +112,10 @@ export class SoloManager {
   private finishScramble(username: string) {
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "scrambling") {
+      logger.warn("Invalid scramble finish attempt", { 
+        username, 
+        sessionState: session?.state 
+      });
       this.notifyUser(username, {
         type: "error",
         payload: "Not in scrambling state. Cannot finish scrambling.",
@@ -98,6 +125,10 @@ export class SoloManager {
 
     session.state = "solving";
     session.start_time = Date.now();
+    logger.info("Scramble finished, solve started", { 
+      username, 
+      sessionId: session.id 
+    });
 
     this.changeState(session, "solving", {
       start_time: session.start_time,
@@ -107,6 +138,10 @@ export class SoloManager {
   private async finishSolve(username: string, time: number) {
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "solving") {
+      logger.warn("Invalid solve finish attempt", { 
+        username, 
+        sessionState: session?.state 
+      });
       this.notifyUser(username, {
         type: "error",
         payload: "Not in solving state. Cannot finish solve.",
@@ -123,12 +158,23 @@ export class SoloManager {
     const server_time = Date.now() - session.start_time!;
     const time_diff = Math.abs(server_time - result.time);
 
-    // Basic validation, if time_diff greater than 2 seconds, use server_time instead
     if (time_diff > 2000) {
+      logger.warn("Time discrepancy detected", { 
+        username, 
+        clientTime: time, 
+        serverTime: server_time,
+        difference: time_diff 
+      });
       result.time = server_time;
     }
 
     session.result = result;
+    logger.info("Solve finished", { 
+      username, 
+      sessionId: session.id, 
+      time: result.time 
+    });
+
     await this.saveSession(session);
 
     this.changeState(session, "results", {
@@ -139,12 +185,23 @@ export class SoloManager {
   private async handlePenalty(username: string, penalty: "DNF" | "plus2" | "none" = "none") {
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "results") {
+      logger.warn("Invalid penalty application attempt", { 
+        username, 
+        sessionState: session?.state 
+      });
       this.notifyUser(username, {
         type: "error",
         payload: "Not in solving state. Cannot apply penalty.",
       });
       return;
     }
+
+    logger.info("Penalty applied", { 
+      username, 
+      sessionId: session.id, 
+      penalty,
+      time: session.result?.time 
+    });
 
     session.result!.penalty = penalty;
     await this.saveSession(session);
@@ -157,9 +214,14 @@ export class SoloManager {
   }
 
   //#region Helper functions
-  // deno-lint-ignore no-explicit-any
   private changeState(session: SoloSession, state: SessionState, payload?: Record<string, any>) {
     session.state = state;
+    logger.debug("Session state changed", { 
+      username: session.participant, 
+      sessionId: session.id,
+      newState: state 
+    });
+
     payload = payload || {};
     payload.state = state;
     this.notifyUser(session.participant, {
@@ -175,8 +237,6 @@ export class SoloManager {
   }
 
   private async saveSession(session: SoloSession) {
-    // Skip storing in testing
-    // I love deno but FUCK YOU this is stupid
     if (this.testing) return;
 
     try {
@@ -193,8 +253,18 @@ export class SoloManager {
         solo_session_id: session.id,
         solve_id: session.result!.id!,
       });
+
+      logger.info("Session saved successfully", { 
+        sessionId: session.id,
+        username: session.participant,
+        solveId: session.result!.id 
+      });
     } catch (error) {
-      console.error(error);
+      logger.error("Failed to save session", { 
+        sessionId: session.id,
+        username: session.participant,
+        error 
+      });
       this.notifyUser(session.participant, {
         type: "error",
         payload: "Failed to save session.",

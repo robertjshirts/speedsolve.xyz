@@ -29,6 +29,12 @@ function RouteComponent() {
         <div className="flex flex-col items-center justify-center h-[60vh]">
           <div className="w-12 h-12 border-4 border-skin-accent border-t-transparent rounded-full animate-spin mb-4"></div>
           <p className="text-xl text-skin-base">Connecting to server...</p>
+          <button
+            onClick={actions.retryConnection}
+            className="mt-4 bg-skin-accent text-skin-base px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
+          >
+            Retry Connection to Server
+          </button>
         </div>
       );
     }
@@ -75,6 +81,12 @@ function RouteComponent() {
           <div className="flex flex-col items-center justify-center h-[60vh]">
             <div className="w-12 h-12 border-4 border-skin-accent border-t-transparent rounded-full animate-spin mb-4"></div>
             <p className="text-xl text-skin-base">Connecting to opponent...</p>
+            <button
+              onClick={actions.sendRTCConnected}
+              className="mt-4 bg-green-500 text-white px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
+            >
+              Connect RTC
+            </button>
           </div>
         );
 
@@ -87,9 +99,6 @@ function RouteComponent() {
                 <CubePreview3d scramble={state.scramble} />
               </>
             )}
-            {Object.entries(state.peers).map(([username, info]) => (
-              <OpponentCard key={username} opponent={{ username }} />
-            ))}
             <button
               onClick={actions.finishScramble}
               className="mt-4 bg-green-500 text-white px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
@@ -162,9 +171,9 @@ function RouteComponent() {
       <div>State: {state.mainState || 'not started'}</div>
       <div>
         Peers:{' '}
-        {Object.entries(state.peers).map(([username, info]) => (
+        {Object.entries(state.peers).map(([username, status]) => (
           <div key={username} className="ml-2">
-            {username}: {info.isReady ? '✅' : '⏳'}
+            {username}: {status === 'peer_ready' ? '✅' : status === 'peer_unready' ? '⏳' : status === 'peer_disconnected' ? '❌' : '❔'}
           </div>
         ))}
       </div>

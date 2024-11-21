@@ -8,6 +8,8 @@ export type Profile = {
   created_at: string
 }
 
+export type PeerStatus = "peer_ready" | "peer_unready" | "peer_disconnected";
+
 // types.ts
 export type SessionState = "queuing" | "connecting" | "scrambling" | "countdown" | "solving" | "results";
 

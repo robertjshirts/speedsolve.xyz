@@ -2,6 +2,7 @@ import { generateScramble } from "./scrambler.ts";
 import { SpeedcubeQueue, QueueMatch } from "./speedcube_queue.ts";
 import type { MultiSession, MultiClientMessage, MultiServerMessage, Result, SessionState, CubeType } from "./types.ts";
 import { upsertMultiSession, upsertMultiSessionSolve, upsertSolve } from "./db/db.ts";
+import { logger } from "./logger.ts";
 
 export class MultiManager {
   private activeSessions: Map<string, MultiSession> = new Map();
@@ -13,36 +14,51 @@ export class MultiManager {
     this.queues = new SpeedcubeQueue();
     this.queues.addListener("match", this.handleMatchMade.bind(this));
     this.testing = testing;
+    logger.info("MultiManager initialized", { testing });
   }
 
   cleanup() {
     this.activeSessions.clear();
     this.connections.clear();
     this.queues.cleanup();
+    logger.debug("MultiManager cleaned up");
   }
 
   addConnection(username: string, ws: WebSocket) {
-    this.connections.set(username, ws);
     this.activeSessions.delete(username);
+    this.connections.set(username, ws);
     ws.onmessage = (event) => this.handleMessage(username, event);
-    ws.onclose = () => this.handleDisconnect(username);
-    ws.onerror = () => this.handleDisconnect(username);
+    ws.onclose = () => {
+      logger.warn("Connection closed", { username });
+      this.handleDisconnect(username);
+    };
+    ws.onerror = () => {
+      logger.error("Connection error", { username });
+      this.handleDisconnect(username);
+    };
+    logger.info("New connection added", { username });
   }
 
   handleDisconnect(username: string) {
     const session = this.activeSessions.get(username);
-    this.connections.delete(username);
+    const ws = this.connections.get(username);
+    if (ws) {
+      ws.close();
+      this.connections.delete(username);
+    }
 
-    if (!session) return;
+    if (!session) {
+      logger.debug("User disconnected without active session", { username });
+      return;
+    }
 
+    logger.info("User disconnected", { username, sessionId: session.id });
     this.queues.removeFromQueue(username, session.cube_type);
     this.notifyPeers(username, {
       type: "peer_disconnected",
       payload: { peer: username },
     });
-    for (const participant of session.participants) {
-      this.activeSessions.delete(participant);
-    }
+    this.activeSessions.delete(username);
   }
 
   getActiveSessions() {
@@ -58,10 +74,12 @@ export class MultiManager {
 
   private handleMessage(username: string, event: MessageEvent) {
     const message = JSON.parse(event.data) as MultiClientMessage;
+    logger.debug("Received message", { username, messageType: message.type });
+
     switch (message.type) {
       case "start_q":
-        // Check to make sure cube type is a valid cube type
         if (!message.payload?.cube_type) {
+          logger.warn("Invalid start_q message - missing cube_type", { username });
           this.notifyUser(username, {
             type: "error",
             payload: { message: "No cube_type provided" },
@@ -88,6 +106,7 @@ export class MultiManager {
         break;
       case "finish_solve":
         if (!message.payload?.time) {
+          logger.warn("Invalid finish_solve message - missing time", { username });
           this.notifyUser(username, {
             type: "error",
             payload: { message: "No time provided" },
@@ -98,6 +117,7 @@ export class MultiManager {
         break;
       case "apply_penalty":
         if (!message.payload?.penalty) {
+          logger.warn("Invalid apply_penalty message - missing penalty", { username });
           this.notifyUser(username, {
             type: "error",
             payload: { message: "No penalty provided" },
@@ -106,8 +126,6 @@ export class MultiManager {
         }
         this.applyPenalty(username, message.payload.penalty);
         break;
-      // 'Channels' are forwarded to all participants except the sender
-      // For WebRTC and chat
       case "rtc_offer":
       case "rtc_answer":
       case "rtc_candidate":
@@ -115,15 +133,15 @@ export class MultiManager {
         this.forwardMessage(username, message);
         break;
       default:
+        logger.warn("Unknown message type received", { username, messageType: message.type });
         this.notifyUser(username, {
           type: "error",
-          payload: { message: "Unknown message type" },
+          payload: { message: `Unknown message type ${message.type}` },
         });
     }
   }
 
   private startQueue(username: string, cube_type: CubeType) {
-    // add minimal session info, just for cube type.
     const session: MultiSession = {
       id: username,
       cube_type,
@@ -136,32 +154,36 @@ export class MultiManager {
       timeoutId: null,
     };
     this.activeSessions.set(username, session);
+    logger.info("User started queuing", { username, cubeType: cube_type });
     this.notifyUser(username, {
       type: "state_change",
       payload: { state: "queuing" },
     });
-    // Add to queue after notifying user, to not break flow as a match can be made instantly and send a reqeust before the user is notified of queuing
     this.queues.addToQueue(username, 0, cube_type);
   }
 
   private handleMatchMade(matchResult: QueueMatch) {
     const { user, match, cube_type } = matchResult;
+    logger.info("Match made", { user, match, cubeType: cube_type });
 
-    // Check state of both users
     const userSession = this.activeSessions.get(user);
     const matchSession = this.activeSessions.get(match);
     if (userSession?.state !== "queuing" || matchSession?.state !== "queuing") {
+      logger.warn("Invalid match state", { 
+        user, 
+        match, 
+        userState: userSession?.state, 
+        matchState: matchSession?.state 
+      });
       this.notifyUser(user, {
         type: "error",
         payload: { message: `${userSession?.state !== "queuing" ? user : match} is not queuing. Cannot make match` },
       });
-      // Only disconnect users bc this is called from queue listener, not from possibly erroneous user
       this.handleDisconnect(user);
       this.handleDisconnect(match);
       return;
     }
 
-    // Unify sessions and change state to connecting
     const session: MultiSession = {
       id: crypto.randomUUID(),
       cube_type,
@@ -176,7 +198,6 @@ export class MultiManager {
     this.activeSessions.set(user, session);
     this.activeSessions.set(match, session);
 
-    // Notify users of state change
     [user, match].forEach(username => {
       this.notifyUser(username, {
         type: "state_change",
@@ -189,9 +210,9 @@ export class MultiManager {
   }
 
   private handleRtcConnected(username: string) {
-    // Check state
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "connecting") {
+      logger.warn("Invalid RTC connection attempt", { username, sessionState: session?.state });
       this.notifyUser(username, {
         type: "error",
         payload: { message: "Not in connecting state. Cannot connect to peer." },
@@ -199,7 +220,7 @@ export class MultiManager {
       return;
     }
 
-    // Add to connected participants and start scrambling if both are connected
+    logger.debug("RTC connected", { username, sessionId: session.id });
     session.readyParticipants.add(username);
     if (session.readyParticipants.size === session.participants.size) {
       this.changeState(session, "scrambling", {
@@ -209,9 +230,9 @@ export class MultiManager {
   }
 
   private finishScramble(username: string) {
-    // Check state
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "scrambling") {
+      logger.warn("Invalid scramble finish attempt", { username, sessionState: session?.state });
       this.notifyUser(username, {
         type: "error",
         payload: { message: "Not in scrambling state. Cannot finish scrambling." },
@@ -219,7 +240,7 @@ export class MultiManager {
       return;
     }
 
-    // Add user to ready participants and check if all participants are ready
+    logger.debug("User finished scrambling", { username, sessionId: session.id });
     this.readyPeer(username);
     if (session.readyParticipants.size === session.participants.size) {
       this.changeState(session, "countdown");
@@ -229,6 +250,7 @@ export class MultiManager {
   private startCountdown(username: string) {
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "countdown") {
+      logger.warn("Invalid countdown start attempt", { username, sessionState: session?.state });
       this.notifyUser(username, {
         type: "error",
         payload: { message: "Not in countdown state. Cannot start countdown." },
@@ -236,10 +258,9 @@ export class MultiManager {
       return;
     }
 
-    // Clear timeout if it exists
     if (session.timeoutId) clearTimeout(session.timeoutId);
 
-    // Add user to ready participants and check if all participants are ready
+    logger.debug("User ready for countdown", { username, sessionId: session.id });
     this.readyPeer(username);
     if (session.readyParticipants.size === session.participants.size) {
       this.notifySession(session, {
@@ -248,7 +269,6 @@ export class MultiManager {
       if (this.testing) {
         this.handleStartSolving(session);
       }
-      // Start solving after 3 seconds
       session.timeoutId = setTimeout(() => {
         this.handleStartSolving(session);
       }, 3000);
@@ -258,6 +278,7 @@ export class MultiManager {
   private cancelCountdown(username: string) {
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "countdown") {
+      logger.warn("Invalid countdown cancel attempt", { username, sessionState: session?.state });
       this.notifyUser(username, {
         type: "error",
         payload: { message: "Not in countdown state. Cannot cancel countdown." },
@@ -265,36 +286,36 @@ export class MultiManager {
       return;
     }
 
-    // Update state
+    logger.info("Countdown canceled", { username, sessionId: session.id });
     if (session.timeoutId) clearTimeout(session.timeoutId);
     session.readyParticipants.delete(username);
 
-    // Notify peers that user is not ready
     this.notifyPeers(username, {
       type: "peer_unready",
       payload: { peer: username },
     });
 
-    // Notify session that countdown was canceled
     this.notifySession(session, {
       type: "countdown_canceled",
     });
   }
 
   private handleStartSolving(session: MultiSession) {
-    // Update start time
     session.start_time = Date.now();
+    logger.info("Solve started", { 
+      sessionId: session.id, 
+      participants: Array.from(session.participants) 
+    });
 
-    // Change state to solving
     this.changeState(session, "solving", {
       start_time: session.start_time,
     });
   }
 
   private async finishSolve(username: string, time: number) {
-    // Check state
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "solving") {
+      logger.warn("Invalid solve finish attempt", { username, sessionState: session?.state });
       this.notifyUser(username, {
         type: "error",
         payload: { message: "Not in solving state. Cannot finish solve." },
@@ -308,14 +329,24 @@ export class MultiManager {
       time, 
     };
 
-    // Basic solve validation
     const serverTime = Date.now() - session.start_time!;
     const timeDifference = Math.abs(serverTime - time);
     if (timeDifference > 1000) {
+      logger.warn("Time discrepancy detected", { 
+        username, 
+        clientTime: time, 
+        serverTime,
+        difference: timeDifference 
+      });
       result.time = serverTime;
     }
 
-    // Add solve result
+    logger.info("Solve finished", { 
+      username, 
+      sessionId: session.id, 
+      time: result.time 
+    });
+
     session.results[username] = result;
     this.readyPeer(username);
     if (session.readyParticipants.size === session.participants.size) {
@@ -329,6 +360,7 @@ export class MultiManager {
   private async applyPenalty(username: string, penalty: "none" | "DNF" | "plus2" = "none") {
     const session = this.activeSessions.get(username);
     if (!session || session.state !== "results") {
+      logger.warn("Invalid penalty application attempt", { username, sessionState: session?.state });
       this.notifyUser(username, {
         type: "error",
         payload: { message: "Not in results state. Cannot apply penalty." },
@@ -336,10 +368,15 @@ export class MultiManager {
       return;
     }
 
-    // if penalty is already applied, do nothing
     if (session.results[username].penalty === penalty) return;
 
-    // apply penalty
+    logger.info("Penalty applied", { 
+      username, 
+      sessionId: session.id, 
+      penalty,
+      time: session.results[username].time 
+    });
+
     session.results[username].penalty = penalty; 
     await this.saveSession(session);
 
@@ -351,10 +388,8 @@ export class MultiManager {
 
   //#region Helper functions
   private async saveSession(session: MultiSession) {
-    // Skip saving in testing
     if (this.testing) return;
 
-    // Insert multi session so we can relate the solves to it
     const winner = this.determineWinner(session);
     try {
       await upsertMultiSession({
@@ -362,9 +397,7 @@ export class MultiManager {
         winner: winner,
       });
 
-      // Insert solves and relate to multi session
       for (const [username, result] of Object.entries(session.results)) {
-        // Insert solve
         await upsertSolve({
           solve_id: result.id!,
           username: username,
@@ -374,14 +407,21 @@ export class MultiManager {
           cube: session.cube_type,
         });
 
-        // Relate solve to multi session
         await upsertMultiSessionSolve({
           multi_session_id: session.id,
           solve_id: result.id!,
         });
       }
+      logger.info("Session saved successfully", { 
+        sessionId: session.id, 
+        winner,
+        participants: Array.from(session.participants)
+      });
     } catch (error) {
-      console.error(error);
+      logger.error("Failed to save session", { 
+        sessionId: session.id, 
+        error 
+      });
       this.notifySession(session, {
         type: "error",
         payload: { message: "Failed to save session." },
@@ -427,16 +467,20 @@ export class MultiManager {
     });
   }
 
-  // deno-lint-ignore no-explicit-any
   private changeState(session: MultiSession, state: SessionState, payload?: Record<string, any>) {
-    // change session
     session.readyParticipants.clear();
     session.state = state;
     if (session.timeoutId) clearTimeout(session.timeoutId);
 
-    // notify participants
+    logger.info("Session state changed", { 
+      sessionId: session.id, 
+      newState: state,
+      participants: Array.from(session.participants)
+    });
+
     payload = payload || {};
     payload.state = state;
+    payload.peers = Array.from(session.participants);
     this.notifySession(session, {
       type: "state_change",
       payload,
@@ -444,6 +488,7 @@ export class MultiManager {
   }
 
   private notifySession(session: MultiSession, message: MultiServerMessage) {
+    logger.debug("Notifying session", { sessionId: session.id, messageType: message.type, messagePayload: message.payload });
     session.participants.forEach(participant => {
       this.notifyUser(participant, message);
     });

@@ -1,18 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
-import { CubeType, Result, SessionState, MultiServerMessage, MultiClientMessageType } from '../types';
+import { PeerStatus, CubeType, Result, SessionState, MultiServerMessage, MultiClientMessageType } from '../types';
 
-interface PeerInfo {
-  username: string;
-  isReady: boolean;
-  // We can extend this later with profile info, etc.
-}
+// Maybe make a peer info object with profile later
 
 interface CompetitionState {
   mainState: SessionState | null;
   scramble?: string;
   results: Record<string, Result>;
-  peers: Record<string, PeerInfo>;
+  peers: Record<string, PeerStatus>;
   error?: string;
 }
 
@@ -20,9 +16,11 @@ interface UseMultiCompetitionReturn {
   state: CompetitionState;
   connectionState: 'disconnected' | 'connecting' | 'connected';
   actions: {
+    retryConnection: () => void;
     startQueue: (cubeType: CubeType) => void;
     cancelQueue: () => void;
     sendRTCSignal: (type: 'offer' | 'answer' | 'candidate', payload: any) => void;
+    sendRTCConnected: () => void;
     finishScramble: () => void;
     startCountdown: () => void;
     cancelCountdown: () => void;
@@ -39,8 +37,22 @@ export function useMultiNew(): UseMultiCompetitionReturn {
     results: {},
     peers: {}
   });
+  const [username, setUsername] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
-  const { getAccessTokenSilently } = useAuth0();
+  const { getAccessTokenSilently, user } = useAuth0();
+
+  useEffect(() => {
+    if (user?.username) {
+      setUsername(user.username!);
+      // Delete the username from the peers object if it exists
+      setState(prev => ({
+        ...prev,
+        peers: Object.fromEntries(
+          Object.entries(prev.peers).filter(([peer]) => peer !== user.username)
+        )
+      }));
+    }
+  }, [user])
 
   const cleanup = useCallback(() => {
     if (wsRef.current) {
@@ -64,79 +76,83 @@ export function useMultiNew(): UseMultiCompetitionReturn {
   }, []);
 
   const handleServerMessage = useCallback((message: MultiServerMessage) => {
-    if (!message.payload) return;
-
     switch (message.type) {
       case 'state_change': {
-        const payload = message.payload as { state: SessionState; scramble?: string; results?: Record<string, Result>; peers?: Record<string, PeerInfo> };
-        if (payload.state === 'queuing') {
-          cleanup();
-          return;
-        }
-
+        const payload = message.payload as { state: SessionState; scramble?: string; results?: Record<string, Result>; peers?: string[] };
+        if (!payload) return console.error("No payload in message of type 'state_change'");
+        // make new peers object
+        const newPeers: Record<string, PeerStatus> = {};
+        payload.peers?.forEach(peer => {
+          if (peer === username) {
+            return;
+          }
+          newPeers[peer] = 'peer_unready';
+        });
         setState(prev => ({
           ...prev,
+          // On state_change, mainState is always updated
           mainState: payload.state,
-          scramble: payload.scramble,
+          scramble: payload.scramble || prev.scramble,
           results: payload.results || prev.results,
-          peers: payload.peers || prev.peers
+          // Peers are also reset on state_change
+          peers: newPeers
         }));
         break;
       }
 
       case 'peer_ready': {
-        const peer = message.payload.peer as string;
-        if (!peer) return;
+        const peer = message.payload?.peer as string;
+        if (!peer) return console.error("No peer in payload on event 'peer_ready'");
 
         setState(prev => ({
           ...prev,
           peers: {
             ...prev.peers,
-            [peer]: {
-              ...(prev.peers[peer] || { username: peer }),
-              isReady: true
-            }
+            [peer]: 'peer_ready'
           }
         }));
         break;
       }
 
       case 'peer_unready': {
-        const peer = message.payload.peer as string;
-        if (!peer) return;
+        const peer = message.payload?.peer as string;
+        if (!peer) return console.error("No peer in payload on event 'peer_unready'");
 
         setState(prev => ({
           ...prev,
           peers: {
             ...prev.peers,
-            [peer]: {
-              ...(prev.peers[peer] || { username: peer }),
-              isReady: false
-            }
+            [peer]: 'peer_unready'
           }
         }));
         break;
       }
 
       case 'peer_disconnected': {
-        const peer = message.payload.peer as string;
-        if (!peer) return;
+        const peer = message.payload?.peer as string;
+        if (!peer) return console.error("No peer in payload on event 'peer_disconnected'");
 
         setState(prev => {
-          const newPeers = { ...prev.peers };
-          delete newPeers[peer];
+          if (prev.mainState !== 'results') {
+            return {
+              ...prev,
+              error: `Peer ${peer} disconnected outside of results phase`
+            }
+          }
           return {
             ...prev,
-            error: `Peer ${peer} disconnected`,
-            peers: newPeers
-          };
+            peers: {
+              ...prev.peers,
+              [peer]: 'peer_disconnected'
+            }
+          }
         });
         break;
       }
 
       case 'results_update': {
-        const results = message.payload.results as Record<string, Result>;
-        if (!results) return;
+        const results = message.payload?.results as Record<string, Result>;
+        if (!results) return console.error("No results in payload on event 'results_update'");
 
         setState(prev => ({
           ...prev,
@@ -146,17 +162,17 @@ export function useMultiNew(): UseMultiCompetitionReturn {
       }
 
       case 'error': {
-        const errorMessage = message.payload.message as string;
-        if (!errorMessage) return;
+        const errorMessage = message.payload?.message as string;
+        if (!errorMessage) return console.error("No error message in payload on event 'error'");
 
         setState(prev => ({
           ...prev,
-          error: errorMessage
+          error: `Websocket error: ${errorMessage}`
         }));
         break;
       }
     }
-  }, [cleanup]);
+  }, []);
 
   const initialize = useCallback(async () => {
     cleanup();
@@ -204,7 +220,7 @@ export function useMultiNew(): UseMultiCompetitionReturn {
       setState(prev => ({ ...prev, error: 'Failed to initialize WebSocket connection' }));
       cleanup();
     }
-  }, [getAccessTokenSilently, handleServerMessage, cleanup]);
+  }, [getAccessTokenSilently, cleanup]);
 
   useEffect(() => {
     initialize();
@@ -212,10 +228,12 @@ export function useMultiNew(): UseMultiCompetitionReturn {
   }, [initialize, cleanup]);
 
   const actions = {
+    retryConnection: initialize,
     startQueue: (cubeType: CubeType) => sendMessage('start_q', { cube_type: cubeType }),
     cancelQueue: () => sendMessage('cancel_q'),
     sendRTCSignal: (type: 'offer' | 'answer' | 'candidate', payload: any) => 
       sendMessage(`rtc_${type}` as MultiClientMessageType, payload),
+    sendRTCConnected: () => sendMessage('rtc_connected'),
     finishScramble: () => sendMessage('finish_scramble'),
     startCountdown: () => sendMessage('start_countdown'),
     cancelCountdown: () => sendMessage('cancel_countdown'),
