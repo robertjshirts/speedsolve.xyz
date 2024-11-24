@@ -67,13 +67,6 @@ function RouteComponent2() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <p className="text-xl text-skin-base">websocket status: {wsStatus}</p>
-      <button onClick={connect} className="bg-skin-accent text-skin-base px-6 py-3 rounded-lg hover:opacity-90 transition-opacity">Connect</button>
-      <button onClick={disconnect} className="bg-red-500 text-white px-6 py-3 rounded-lg hover:opacity-90 transition-opacity">Disconnect</button>
-      <br />
-      <p className="text-xl text-skin-base">compState: {compState}</p>
-      <p className="text-xl text-skin-base">rtcStatus: {rtcStatus}</p>
-      <br />
       {renderMainContent()}
       {renderStreams()}
     </div>
