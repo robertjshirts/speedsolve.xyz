@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { User } from '@auth0/auth0-react';
-import { CompetitionState } from './types';
+import { CompetitionState, PeerStatus } from './types';
+
 
 type MultiState = {
   wsStatus: 'disconnected' | 'connecting' | 'connected';
@@ -8,7 +9,10 @@ type MultiState = {
   rtcStatus: 'connected' | 'connecting' | 'disconnected';
   localStream: MediaStream | null;
   remoteStream: MediaStream | null;
+  scramble: string | null;
+  countdownStarted: boolean;
   error: string | null;
+  peers: Record<string, PeerStatus>;
 }
 
 type MultiActions = {
@@ -17,7 +21,11 @@ type MultiActions = {
   setRtcStatus: (status: 'connected' | 'connecting' | 'disconnected') => void; 
   setLocalStream: (stream: MediaStream | null) => void;
   setRemoteStream: (stream: MediaStream | null) => void;
+  setScramble: (scramble: string) => void;
+  setCountdownStarted: (started: boolean) => void;
   setError: (error: string | null) => void;
+  setPeerStatus: (username: string, status: PeerStatus) => void;
+  resetPeers: () => void;
   reset: () => void;
 }
 
@@ -27,7 +35,10 @@ const initialMultiState: MultiState = {
   rtcStatus: 'disconnected',
   localStream: null,
   remoteStream: null,
+  scramble: '',
+  countdownStarted: false,
   error: null,
+  peers: {},
 };
 
 export const useMultiStore = create<MultiState & MultiActions>((set) => ({
@@ -37,8 +48,11 @@ export const useMultiStore = create<MultiState & MultiActions>((set) => ({
   setRtcStatus: (status) => set({ rtcStatus: status }),
   setLocalStream: (stream) => set({ localStream: stream }),
   setRemoteStream: (stream) => set({ remoteStream: stream }),
+  setScramble: (scramble) => set({ scramble }),
+  setCountdownStarted: (started) => set({ countdownStarted: started }),
   setError: (error) => set({ error }),
-
+  setPeerStatus: (username, status) => set((state) => ({ peers: { ...state.peers, [username]: status } })),
+  resetPeers: () => set({ peers: {} }),
   reset: () => set(initialMultiState),
 }));
 

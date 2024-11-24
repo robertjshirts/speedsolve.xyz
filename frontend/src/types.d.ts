@@ -8,7 +8,7 @@ export type Profile = {
   created_at: string
 }
 
-export type PeerStatus = "peer_ready" | "peer_unready" | "peer_disconnected";
+export type PeerStatus = "ready" | "unready" | "disconnected";
 export type WSStatus = "connecting" | "connected" | "disconnected";
 export type RTCStatus = "connected" | "connecting" | "disconnected" | "closed" | "failed";
 export interface RTCState {
@@ -54,15 +54,14 @@ export type MultiClientMessageType =
 export type MultiServerMessageType =
   | "state_change"
   | "error"
-  | "peer_ready"
-  | "peer_unready"
-  | "peer_disconnected"
+  | "peer_update"
   | "countdown_started"
   | "countdown_canceled"
   | "results_update"
   | "rtc_offer"
   | "rtc_answer"
-  | "rtc_candidate";
+  | "rtc_candidate"
+  | "session_ended";
 
 export interface MultiClientMessage {
   type: MultiClientMessageType;

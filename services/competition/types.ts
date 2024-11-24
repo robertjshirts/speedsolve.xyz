@@ -49,15 +49,16 @@ export type MultiClientMessageType =
 	| "apply_penalty"
 	| "leave_session";
 
+export type PeerStatus = "ready" | "unready" | "disconnected";
+
 type MultiServerMessageType = 
 	| "state_change" 
 	| "error" 
-	| "peer_ready" 
-	| "peer_unready" 
-	| "peer_disconnected" 
+	| "peer_update"
 	| "countdown_started" 
 	| "countdown_canceled" 
-	| "results_update";
+	| "results_update"
+	| "session_ended";
 
 export interface MultiClientMessage {
 	type: MultiClientMessageType;

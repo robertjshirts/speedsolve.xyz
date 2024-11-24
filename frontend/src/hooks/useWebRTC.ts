@@ -2,22 +2,19 @@ import { useRef, useCallback, useState } from 'react';
 import { MultiClientMessageType, RTCStatus } from '../types';
 import { useMultiStore } from '../store';
 
-interface UseWebRTCReturn {
-  startConnection: (isOfferer: boolean) => void;
-  handleRTCMessage: (type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate', payload: any) => void;
-}
-
 interface QueuedMessage {
   type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate';
   payload: Record<string, any>;
 }
 
-export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: Record<string, any>) => void): UseWebRTCReturn {
+export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: Record<string, any>) => void) {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
   const messageQueueRef = useRef<QueuedMessage[]>([]);
   const { setRtcStatus, setRemoteStream, setLocalStream } = useMultiStore(state => state);
+  const localStream = useMultiStore(state => state.localStream);
+  const remoteStream = useMultiStore(state => state.remoteStream);
 
-  const processQueuedMessages = useCallback(async () => {
+  const processQueuedMessages = async () => {
     const pc = peerConnectionRef.current;
     if (!pc) return;
 
@@ -31,7 +28,6 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
           sendMessage('rtc_answer', { answer });
-          console.log("rtc_answer sent (from queue)");
           break;
         case 'rtc_answer':
           await pc.setRemoteDescription(new RTCSessionDescription(message.payload.answer!));
@@ -41,14 +37,13 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
           break;
       }
     }
-  }, [sendMessage]);
+  };
 
-  const handleRTCMessage = useCallback(async (type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate', payload: Record<string, any>) => {
+  const handleRTCMessage = async (type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate', payload: Record<string, any>) => {
     if (!payload) return console.error(`No payload in message of type '${type}'`);
 
     // If peer connection isn't ready, queue the message
     if (!peerConnectionRef.current) {
-      console.log(`Queueing ${type} message as peer connection isn't ready`);
       messageQueueRef.current.push({ type, payload });
       return;
     }
@@ -56,7 +51,6 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
     const pc = peerConnectionRef.current;
     switch (type) {
       case 'rtc_offer':
-        console.log('rtc_offer received');
         await pc.setRemoteDescription(new RTCSessionDescription(payload.offer!));
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
@@ -64,15 +58,13 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
         console.log("rtc_answer sent");
         break;
       case 'rtc_answer':
-        console.log('rtc_answer received');
         await pc.setRemoteDescription(new RTCSessionDescription(payload.answer!));
         break;
       case 'rtc_candidate':
-        console.log('rtc_candidate received');
         await pc.addIceCandidate(new RTCIceCandidate(payload.candidate!));
         break;
     }
-  }, [peerConnectionRef, sendMessage]);
+  };
 
   const startConnection = useCallback(async (isOfferer: boolean) => {
     const iceServers = await fetch(import.meta.env.VITE_ICE_SERVERS_URL).then(res => res.json());
@@ -85,17 +77,14 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
         frameRate: { ideal: 30 },
       }, audio: true });
     if (!stream) return console.error('No local stream could be found or created in startConnection');
-    console.log("got local stream");
     setLocalStream(stream);
     // Push tracks to peer connection
     stream.getTracks().forEach(track => {
-      console.log("adding track to peer connection", track);
       pc.addTrack(track, stream)
     });
 
     // Set up event listeners
     pc.ontrack = (e) => {
-      console.log("track received", e.streams);
       const [remoteStream] = e.streams;
       setRemoteStream(remoteStream);
     };
@@ -109,7 +98,6 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
 
     // Listen for connection state changes
     pc.onconnectionstatechange = () => {
-      console.log("connection state changed", pc.connectionState);
       switch (pc.connectionState) {
         case "new":
         case "connecting":
@@ -122,7 +110,6 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
         case "closed":
         case "disconnected":
         case "failed":
-          console.log("rtc connection state: ", pc.connectionState);
           setRtcStatus("disconnected");
           break;
       }
@@ -143,5 +130,26 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
     }
   }, [sendMessage, processQueuedMessages]);
 
-  return { handleRTCMessage, startConnection };
+  const endConnection = () => {
+    const pc = peerConnectionRef.current;
+
+    localStream?.getTracks().forEach(track => track.stop());
+    remoteStream?.getTracks().forEach(track => track.stop());
+
+    setLocalStream(null);
+    setRemoteStream(null);
+    setRtcStatus('disconnected');
+
+    if (pc) {
+      pc.ontrack = null;
+      pc.onicecandidate = null;
+      pc.onconnectionstatechange = null;
+      pc.close();
+      peerConnectionRef.current = null;
+    }
+
+    messageQueueRef.current = [];
+  };
+
+  return { handleRTCMessage, startConnection, endConnection };
 }

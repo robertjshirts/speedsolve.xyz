@@ -1,6 +1,6 @@
 import { generateScramble } from "./scrambler.ts";
 import { SpeedcubeQueue, QueueMatch } from "./speedcube_queue.ts";
-import type { MultiSession, MultiClientMessage, MultiServerMessage, Result, SessionState, CubeType } from "./types.ts";
+import type { MultiSession, MultiClientMessage, MultiServerMessage, Result, SessionState, CubeType, PeerStatus } from "./types.ts";
 import { upsertMultiSession, upsertMultiSessionSolve, upsertSolve } from "./db/db.ts";
 import { logger } from "./logger.ts";
 
@@ -55,10 +55,7 @@ export class MultiManager {
 
     logger.info("User disconnected", { username, sessionId: session.id });
     this.queues.removeFromQueue(username, session.cube_type);
-    this.notifyPeers(username, {
-      type: "peer_disconnected",
-      payload: { peer: username },
-    });
+    this.updatePeer(username, 'disconnected');
     this.activeSessions.delete(username);
   }
 
@@ -222,7 +219,7 @@ export class MultiManager {
     }
 
     logger.debug("RTC connected", { username, sessionId: session.id });
-    session.readyParticipants.add(username);
+    this.updatePeer(username, "ready");
     if (session.readyParticipants.size === session.participants.size) {
       this.changeState(session, "scrambling", {
         scramble: generateScramble(session.cube_type),
@@ -242,7 +239,7 @@ export class MultiManager {
     }
 
     logger.debug("User finished scrambling", { username, sessionId: session.id });
-    this.readyPeer(username);
+    this.updatePeer(username, "ready");
     if (session.readyParticipants.size === session.participants.size) {
       this.changeState(session, "countdown");
     }
@@ -262,14 +259,11 @@ export class MultiManager {
     if (session.timeoutId) clearTimeout(session.timeoutId);
 
     logger.debug("User ready for countdown", { username, sessionId: session.id });
-    this.readyPeer(username);
+    this.updatePeer(username, "ready");
     if (session.readyParticipants.size === session.participants.size) {
       this.notifySession(session, {
         type: "countdown_started",
       });
-      if (this.testing) {
-        this.handleStartSolving(session);
-      }
       session.timeoutId = setTimeout(() => {
         this.handleStartSolving(session);
       }, 3000);
@@ -291,10 +285,7 @@ export class MultiManager {
     if (session.timeoutId) clearTimeout(session.timeoutId);
     session.readyParticipants.delete(username);
 
-    this.notifyPeers(username, {
-      type: "peer_unready",
-      payload: { peer: username },
-    });
+    this.updatePeer(username, "unready");
 
     this.notifySession(session, {
       type: "countdown_canceled",
@@ -349,7 +340,7 @@ export class MultiManager {
     });
 
     session.results[username] = result;
-    this.readyPeer(username);
+    this.updatePeer(username, "ready");
     if (session.readyParticipants.size === session.participants.size) {
       await this.saveSession(session);
       this.changeState(session, "results", {
@@ -399,11 +390,12 @@ export class MultiManager {
       participants: Array.from(session.participants) 
     });
 
-    // TODO: Graceful session end if not in results state. handled by frontend for now, should be handled here too/instead
-    this.notifyPeers(username, {
-      type: "peer_disconnected",
-      payload: { peer: username },
+    this.notifyUser(username, {
+      type: "session_ended"
     });
+
+    // TODO: Graceful session end if not in results state. handled by frontend for now, should be handled here too/instead
+    this.updatePeer(username, "disconnected");
   }
 
   //#region Helper functions
@@ -478,16 +470,6 @@ export class MultiManager {
     return winner_username;
   }
 
-  private readyPeer(username: string) {
-    const session = this.activeSessions.get(username);
-    if (!session) return;
-    session.readyParticipants.add(username);
-    this.notifyPeers(username, {
-      type: "peer_ready",
-      payload: { peer: username },
-    });
-  }
-
   private changeState(session: MultiSession, state: SessionState, payload?: Record<string, any>) {
     session.readyParticipants.clear();
     session.state = state;
@@ -501,11 +483,15 @@ export class MultiManager {
 
     payload = payload || {};
     payload.state = state;
-    payload.peers = Array.from(session.participants);
     this.notifySession(session, {
       type: "state_change",
       payload,
     });
+
+    // Reset each peer's status
+    for (const participant of session.participants) {
+      this.updatePeer(participant, 'unready');
+    }
   }
 
   private notifySession(session: MultiSession, message: MultiServerMessage) {
@@ -515,12 +501,23 @@ export class MultiManager {
     });
   }
 
-  private notifyPeers(sender: string, message: MultiServerMessage) {
-    const session = this.activeSessions.get(sender);
+  private updatePeer(peer: string, status: PeerStatus) {
+    // Update peer's status and notify other participants
+    const session = this.activeSessions.get(peer);
     if (!session) return;
-    session.participants.forEach(peer => {
-      if (peer === sender) return;
-      this.notifyUser(peer, message);
+    if (status === "ready") {
+      session.readyParticipants.add(peer);
+    } else {
+      session.readyParticipants.delete(peer);
+    }
+
+    // Notify all participants of the peer's status change
+    session.participants.forEach(otherPeer => {
+      if (peer === otherPeer) return;
+      this.notifyUser(otherPeer, {
+        type: "peer_update",
+        payload: { peer, status },
+      });
     });
   }
 

@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { useMultiStore } from "../store";
 import { useWebRTC } from "../hooks/useWebRTC";
-import { MultiServerMessage, MultiClientMessageType, CompetitionState } from "../types";
+import { MultiServerMessage, MultiClientMessageType, CompetitionState, PeerStatus } from "../types";
 
 export function useMulti2() {
   const multiStore = useMultiStore();
@@ -28,7 +28,6 @@ export function useMulti2() {
     wsRef.current.onmessage = (ev) => {
       const message: MultiServerMessage = JSON.parse(ev.data);
       console.log('Received message:', message);
-      console.log('typeof handleMessage:', typeof handleMessage);
       handleMessage(message);
     };
 
@@ -45,6 +44,7 @@ export function useMulti2() {
 
   const disconnect = () => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      endConnection();
       wsRef.current.close();
       multiStore.reset();
     }
@@ -56,14 +56,31 @@ export function useMulti2() {
         const state = message.payload!.state as CompetitionState;
         multiStore.setCompState(state);
         if (message.payload!.isOfferer) isOfferer.current = message.payload!.isOfferer as boolean;
-        // if (message.payload!.scramble) multiStore.setScramble(message.payload!.scramble as string);
+        if (message.payload!.scramble) multiStore.setScramble(message.payload!.scramble as string);
         // if (message.payload!.results) multiStore.setResults(message.payload!.results as Record<string, Result>);
+        break;
+      }
+      case 'peer_update': {
+        const newPeer = message.payload as { username: string, status: PeerStatus };
+        multiStore.setPeerStatus(newPeer.username, newPeer.status);
+        break;
+      };
+      case 'countdown_started': {
+        multiStore.setCountdownStarted(true);
+        break;
+      }
+      case 'countdown_canceled': {
+        multiStore.setCountdownStarted(false);
         break;
       }
       case 'rtc_offer':
       case 'rtc_answer':
       case 'rtc_candidate': {
         handleRTCMessage(message.type, message.payload!);
+        break;
+      }
+      case 'session_ended': {
+        multiStore.reset();
         break;
       }
       default: {
@@ -80,13 +97,16 @@ export function useMulti2() {
     }
   }, [wsRef])
 
-  const { startConnection, handleRTCMessage } = useWebRTC(sendMessage);
+  const { startConnection, handleRTCMessage, endConnection } = useWebRTC(sendMessage);
 
   // Side effects of compState changes
   useEffect(() => {
     switch (compState) {
       case 'connecting':
         startConnection(isOfferer.current);
+        break;
+      case null:
+        endConnection();
         break;
     }
   }, [compState])
@@ -104,5 +124,9 @@ export function useMulti2() {
     connect,
     disconnect,
     startQueue: () => sendMessage('start_q', { cube_type: '3x3' }),
+    cancelQueue: () => sendMessage('cancel_q'),
+    finishScramble: () => sendMessage('finish_scramble'),
+    startCountdown: () => sendMessage('start_countdown'),
+    cancelCountdown: () => sendMessage('cancel_countdown'),
   };
 }

@@ -42,6 +42,9 @@ class MockWebSocket {
     if (this.options.enableMessageTracking) this.sentMessages.unshift(message);
   }
 
+  // Mock method to close the connection
+  close() {}
+
   // Mock method to simulate receiving a message
   simulateMessage(data: string) {
     if (this.events["message"]) {

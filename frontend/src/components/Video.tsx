@@ -20,7 +20,7 @@ export const Video = ({ stream, muted }: { stream: MediaStream | null, muted: bo
         ref={videoRef} 
         autoPlay 
         playsInline 
-        className="w-48 h-36 object-contain" 
+        className="w-48 object-contain" 
       />
     </button>
   );

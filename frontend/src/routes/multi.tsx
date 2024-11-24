@@ -7,6 +7,12 @@ import { useAuth } from '../hooks/useAuth'
 import { useMultiStore } from '../store'
 import { useMulti2 } from '../hooks/useMulti2'
 import { Video } from '../components/Video'
+import { MultiConnection } from '../components/MultiConnection'
+import { MultiIdle } from '../components/MultiIdle'
+import { MultiQueue } from '../components/MultiQueue'
+import { MultiRTC } from '../components/MultiRTC'
+import { MultiScramble } from '../components/MultiScramble'
+import { MultiCountdown } from '../components/MultiCountdown'
 
 export const Route = createFileRoute('/multi')({
   component: RouteComponent2,
@@ -15,7 +21,7 @@ export const Route = createFileRoute('/multi')({
 function RouteComponent2() {
   const { isAuthenticated } = useAuth();
   const { wsStatus, compState, rtcStatus, remoteStream, localStream } = useMultiStore();
-  const { connect, disconnect, startQueue } = useMulti2();
+  const { connect, disconnect, startQueue, cancelQueue, finishScramble, startCountdown, cancelCountdown } = useMulti2();
 
   if (!isAuthenticated) {
     return (
@@ -26,23 +32,21 @@ function RouteComponent2() {
   }
 
   const renderMainContent = () => {
+    if (wsStatus !== 'connected') {
+      return <MultiConnection connect={connect} disconnect={disconnect} />;
+    }
+
     switch (compState) {
-      case null:
-        return (
-          <div className="flex flex-col items-center justify-center h-[60vh]">
-            <button 
-              onClick={startQueue}
-              className="bg-skin-accent text-skin-base px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
-            >
-              Start Queue
-            </button>
-          </div>
-        );
+      case null: return <MultiIdle startQueue={startQueue} />;
+      case 'queuing': return <MultiQueue cancelQueue={cancelQueue} />;
+      case 'connecting': return <MultiRTC />;
+      case 'scrambling': return <MultiScramble finishScramble={finishScramble} />;
+      case 'countdown': return <MultiCountdown startCountdown={startCountdown} cancelCountdown={cancelCountdown} />;
     }
   };
 
   const renderStreams = () => {
-    if (compState === 'queuing' || compState === 'connecting') return null;
+    if (!compState || compState === 'queuing' || compState === 'connecting') return null;
     return (
       <div className="fixed bottom-4 left-4 flex gap-4 bg-gray-800 text-white p-4 rounded-lg opacity-75 hover:opacity-100 transition-opacity">
         <Video stream={remoteStream} muted={false} />

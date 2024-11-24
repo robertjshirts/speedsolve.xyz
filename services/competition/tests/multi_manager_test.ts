@@ -7,6 +7,9 @@ import {
   assertArrayIncludes,
 } from "jsr:@std/assert";
 import { FakeTime } from "jsr:@std/testing/time";
+import { Logger, LogLevel } from "../logger.ts";
+
+Logger.getInstance().setLogLevel(LogLevel.NONE);
 
 const mockCubeType = "3x3";
 const username1 = "test1";
@@ -196,12 +199,24 @@ Deno.test("Regular multi solve", async (t) => {
       const session = manager.getActiveSessions().get(username1)
       assertEquals(session!.state, "scrambling");
 
-      const scrambleMessage1 = JSON.parse(ws1.sentMessages[0]);
-      const scrambleMessage2 = JSON.parse(ws2.sentMessages[0]);
+      // State change message is sent first (starts index 0)
+      // Then peer update message is sent second (inserted at index 0, moves change message to index 1)
+      // Because the peer update message is informing users that all peers are unready (bc it is a new state)
+
+      const scrambleMessage1 = JSON.parse(ws1.sentMessages[1]);
+      const scrambleMessage2 = JSON.parse(ws2.sentMessages[1]);
       assertEquals(scrambleMessage1, scrambleMessage2, "both users should receive identical state change messages");
       assertEquals(scrambleMessage1.type, "state_change");
       assertEquals(scrambleMessage1.payload.state, "scrambling");
       assertExists(scrambleMessage1.payload.scramble);
+
+      // Check for peer_update messages
+      const peerUpdate1 = JSON.parse(ws1.sentMessages[0]);
+      const peerUpdate2 = JSON.parse(ws2.sentMessages[0]);
+      assertEquals(peerUpdate1.type, "peer_update");
+      assertEquals(peerUpdate2.type, "peer_update");
+      assertEquals(peerUpdate1.payload.status, "unready");
+      assertEquals(peerUpdate2.payload.status, "unready");
     });
 
     await t.step("user1 finishes scrambling", async () => {
@@ -213,8 +228,10 @@ Deno.test("Regular multi solve", async (t) => {
       const session = manager.getActiveSessions().get(username1);
       assertEquals(session!.state, "scrambling");
 
-      const scrambleFinishedMessage = JSON.parse(ws2.sentMessages[0]);
-      assertEquals(scrambleFinishedMessage.type, "peer_ready");
+      const peerUpdate = JSON.parse(ws2.sentMessages[0]);
+      assertEquals(peerUpdate.type, "peer_update");
+      assertEquals(peerUpdate.payload.peer, username1);
+      assertEquals(peerUpdate.payload.status, "ready");
     });
 
     await t.step("user2 finishes scrambling", async () => {
@@ -226,15 +243,18 @@ Deno.test("Regular multi solve", async (t) => {
       const session = manager.getActiveSessions().get(username1);
       assertEquals(session!.state, "countdown");
 
-      const scrambleFinishedMessage1 = JSON.parse(ws1.sentMessages[0]);
-      const scrambleFinishedMessage2 = JSON.parse(ws2.sentMessages[0]);
-      assertEquals(scrambleFinishedMessage1, scrambleFinishedMessage2, "both users should receive identical state change messages");
-      assertEquals(scrambleFinishedMessage1.type, "state_change");
-      assertEquals(scrambleFinishedMessage1.payload.state, "countdown");
+      const stateChange1 = JSON.parse(ws1.sentMessages[1]);
+      const stateChange2 = JSON.parse(ws2.sentMessages[1]);
+      assertEquals(stateChange1, stateChange2, "both users should receive identical state change messages");
+      assertEquals(stateChange1.type, "state_change");
+      assertEquals(stateChange1.payload.state, "countdown");
 
-      const readyMessage1 = JSON.parse(ws1.sentMessages[1]);
-      assertEquals(readyMessage1.type, "peer_ready");
-      assertEquals(readyMessage1.payload.peer, username2);
+      const peerUpdate1 = JSON.parse(ws1.sentMessages[0]);
+      const peerUpdate2 = JSON.parse(ws2.sentMessages[0]);
+      assertEquals(peerUpdate1.type, "peer_update");
+      assertEquals(peerUpdate2.type, "peer_update");
+      assertEquals(peerUpdate1.payload.status, "unready");
+      assertEquals(peerUpdate2.payload.status, "unready");
     });
 
     await t.step("user1 starts countdown", async () => {
@@ -246,25 +266,26 @@ Deno.test("Regular multi solve", async (t) => {
       const session = manager.getActiveSessions().get(username1);
       assertEquals(session!.state, "countdown");
 
-      const readyMessage = JSON.parse(ws2.sentMessages[0]);
-      assertEquals(readyMessage.type, "peer_ready");
-      assertEquals(readyMessage.payload.peer, username1);
+      const peerUpdate = JSON.parse(ws2.sentMessages[0]);
+      assertEquals(peerUpdate.type, "peer_update");
+      assertEquals(peerUpdate.payload.peer, username1);
+      assertEquals(peerUpdate.payload.status, "ready");
     });
 
     await t.step("user2 starts countdown", async () => {
       ws2.simulateMessage(JSON.stringify({
         type: "start_countdown",
       }));
-      await Promise.resolve();
 
       const countdownStartedMessage1 = JSON.parse(ws1.sentMessages[0]);
       const countdownStartedMessage2 = JSON.parse(ws2.sentMessages[0]);
       assertEquals(countdownStartedMessage1, countdownStartedMessage2, "both users should receive identical countdown started messages");
       assertEquals(countdownStartedMessage1.type, "countdown_started");
 
-      const readyMessage1 = JSON.parse(ws1.sentMessages[1]);
-      assertEquals(readyMessage1.type, "peer_ready");
-      assertEquals(readyMessage1.payload.peer, username2);
+      const peerUpdate = JSON.parse(ws1.sentMessages[1]);
+      assertEquals(peerUpdate.type, "peer_update");
+      assertEquals(peerUpdate.payload.peer, username2);
+      assertEquals(peerUpdate.payload.status, "ready");
     });
 
     await t.step("user1 cancels countdown", async () => {
@@ -278,9 +299,10 @@ Deno.test("Regular multi solve", async (t) => {
 
       assertEquals(session!.state, "countdown");
 
-      const unreadyMessage = JSON.parse(ws2.sentMessages[1]);
-      assertEquals(unreadyMessage.type, "peer_unready");
-      assertEquals(unreadyMessage.payload.peer, username1);
+      const peerUpdate = JSON.parse(ws2.sentMessages[1]);
+      assertEquals(peerUpdate.type, "peer_update");
+      assertEquals(peerUpdate.payload.peer, username1);
+      assertEquals(peerUpdate.payload.status, "unready");
 
       const cancelMessage1 = JSON.parse(ws1.sentMessages[0]);
       const cancelMessage2 = JSON.parse(ws2.sentMessages[0]);
@@ -299,9 +321,10 @@ Deno.test("Regular multi solve", async (t) => {
       assertEquals(countdownStartedMessage1, countdownStartedMessage2, "both users should receive identical countdown started messages");
       assertEquals(countdownStartedMessage1.type, "countdown_started");
 
-      const readyMessage2 = JSON.parse(ws2.sentMessages[1]);
-      assertEquals(readyMessage2.type, "peer_ready");
-      assertEquals(readyMessage2.payload.peer, username1);
+      const peerUpdate = JSON.parse(ws2.sentMessages[1]);
+      assertEquals(peerUpdate.type, "peer_update");
+      assertEquals(peerUpdate.payload.peer, username1);
+      assertEquals(peerUpdate.payload.status, "ready");
     });
 
     await t.step("countdown ends", () => {
@@ -310,12 +333,19 @@ Deno.test("Regular multi solve", async (t) => {
       const session = manager.getActiveSessions().get(username1);
       assertEquals(session!.state, "solving");
 
-      const stateChangeMessage1 = JSON.parse(ws1.sentMessages[0]);
-      const stateChangeMessage2 = JSON.parse(ws2.sentMessages[0]);
+      const stateChangeMessage1 = JSON.parse(ws1.sentMessages[1]);
+      const stateChangeMessage2 = JSON.parse(ws2.sentMessages[1]);
       assertEquals(stateChangeMessage1, stateChangeMessage2, "both users should receive identical state change messages");
       assertEquals(stateChangeMessage1.type, "state_change");
       assertEquals(stateChangeMessage1.payload.state, "solving");
       assertExists(stateChangeMessage1.payload.start_time);
+
+      const peerUpdate1 = JSON.parse(ws1.sentMessages[0]);
+      const peerUpdate2 = JSON.parse(ws2.sentMessages[0]);
+      assertEquals(peerUpdate1.type, "peer_update");
+      assertEquals(peerUpdate2.type, "peer_update");
+      assertEquals(peerUpdate1.payload.status, "unready");
+      assertEquals(peerUpdate2.payload.status, "unready");
     });
 
     await t.step("user1 finishes solve", async () => {
@@ -334,8 +364,10 @@ Deno.test("Regular multi solve", async (t) => {
       assertEquals(session!.results[username1]!.penalty, "none");
       assertEquals(session!.results[username1]!.time, 10000);
 
-      const readyMessage = JSON.parse(ws2.sentMessages[0]);
-      assertEquals(readyMessage.type, "peer_ready");
+      const peerUpdate = JSON.parse(ws2.sentMessages[0]);
+      assertEquals(peerUpdate.type, "peer_update");
+      assertEquals(peerUpdate.payload.peer, username1);
+      assertEquals(peerUpdate.payload.status, "ready");
     });
 
     await t.step("user2 finishes solve", async () => {
@@ -351,8 +383,8 @@ Deno.test("Regular multi solve", async (t) => {
       const session = manager.getActiveSessions().get(username1);
       assertEquals(session!.state, "results");
 
-      const resultsMessage1 = JSON.parse(ws1.sentMessages[0]);
-      const resultsMessage2 = JSON.parse(ws2.sentMessages[0]);
+      const resultsMessage1 = JSON.parse(ws1.sentMessages[1]);
+      const resultsMessage2 = JSON.parse(ws2.sentMessages[1]);
       assertEquals(resultsMessage1, resultsMessage2, "both users should receive identical results messages");
       assertEquals(resultsMessage1.type, "state_change");
       assertEquals(resultsMessage1.payload.state, "results");
@@ -361,6 +393,13 @@ Deno.test("Regular multi solve", async (t) => {
         Object.keys(resultsMessage1.payload.results),
         [username1, username2],
       );
+
+      const peerUpdate1 = JSON.parse(ws1.sentMessages[0]);
+      const peerUpdate2 = JSON.parse(ws2.sentMessages[0]);
+      assertEquals(peerUpdate1.type, "peer_update");
+      assertEquals(peerUpdate2.type, "peer_update");
+      assertEquals(peerUpdate1.payload.status, "unready");
+      assertEquals(peerUpdate2.payload.status, "unready");
     });
 
     await t.step("user1 applies penalty", async () => {
@@ -463,12 +502,14 @@ Deno.test("User disconnects in scramble", async (t) => {
       await Promise.resolve();
 
       // Verify session is cleaned up
-      assertEquals(manager.getActiveSessions().size, 0, "session should be removed after disconnect");
+      // Still a session for user2
+      assertEquals(manager.getActiveSessions().size, 1, "session should be removed after disconnect");
 
       // Verify remaining user gets disconnection notification
       const disconnectMessage = JSON.parse(ws2.sentMessages[0]);
-      assertEquals(disconnectMessage.type, "peer_disconnected");
+      assertEquals(disconnectMessage.type, "peer_update");
       assertEquals(disconnectMessage.payload.peer, username1);
+      assertEquals(disconnectMessage.payload.status, "disconnected");
     });
   } finally {
     manager.cleanup();
