@@ -1,48 +1,59 @@
-import { useEffect } from "react";
-import { useMultiStore } from "../store";
+import { useEffect, useState } from 'react';
+import { useMultiStore } from '../store';
 
-export const MultiCountdown = ({ startCountdown, cancelCountdown}: {
+export const MultiCountdown = ({ 
+  startCountdown, 
+  cancelCountdown
+}: {
   startCountdown: () => void;
   cancelCountdown: () => void;
 }) => {
   const countdownStarted = useMultiStore(state => state.countdownStarted);
   const peers = useMultiStore(state => state.peers);
+  const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat) {
+        setIsReady(true);
         startCountdown();
       }
-    };
-    const handleKeyUp = (e: KeyboardEvent) => { 
+    }
+    window.addEventListener('keydown', handleKeyDown);
+
+    const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'Space') {
+        setIsReady(false);
         cancelCountdown();
       }
     }
-
-    window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
-    }
-
+    };
   }, [startCountdown, cancelCountdown]);
 
-  const unreadyPeers = Object.values(peers).filter(status => status === 'unready');
+  const unreadyPeers = Object.entries(peers)
+    .filter(([_, status]) => status !== 'ready')
+    .map(([peer]) => peer);
 
   const getMessage = () => {
     if (countdownStarted) {
       return 'Get ready to solve!';
     }
-    // If no unready peers, and not started, we are waiting on user
-    if (unreadyPeers.length === 0) {
-      return 'Hold space when ready';
+    
+    let msg = '';
+    if (!isReady) {
+      msg += 'Press space to ready up';
     }
-
-    // If there are unready peers, we are waiting on them
-    const names = unreadyPeers.join(', ');
-    return `${names} ${unreadyPeers.length === 1 ? 'is' : 'are'} unready`;
+    if (unreadyPeers.length > 0) {
+      if (msg) msg += '\n';
+      const names = unreadyPeers.join(', ');
+      msg += `${names} ${unreadyPeers.length === 1 ? 'is' : 'are'} not ready`;
+    }
+    return msg || 'Everyone is ready! Waiting on server to start countdown...';
   };
 
   return (
@@ -51,4 +62,3 @@ export const MultiCountdown = ({ startCountdown, cancelCountdown}: {
     </div>
   );
 };
-
