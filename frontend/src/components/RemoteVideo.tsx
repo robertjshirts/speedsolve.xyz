@@ -10,6 +10,6 @@ export const RemoteVideo = ({ stream}: { stream: MediaStream | null }) => {
   }, [stream]);
 
   return (
-    <video ref={videoRef} autoPlay playsInline />
+    <video ref={videoRef} autoPlay playsInline className="w-48 h-36 object-contain" />
   );
 }

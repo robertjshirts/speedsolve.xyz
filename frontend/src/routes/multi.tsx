@@ -14,7 +14,7 @@ export const Route = createFileRoute('/multi')({
 
 function RouteComponent2() {
   const { isAuthenticated } = useAuth();
-  const { wsStatus, compState, rtcStatus, remoteStream } = useMultiStore();
+  const { wsStatus, compState, rtcStatus, remoteStream, localStream } = useMultiStore();
   const { connect, disconnect, startQueue } = useMulti2();
 
   if (!isAuthenticated) {
@@ -41,15 +41,15 @@ function RouteComponent2() {
     }
   };
 
-  const renderRemoteStream = () => {
+  const renderStreams = () => {
     if (compState === 'queuing' || compState === 'connecting') return null;
-
     return (
-      <div className="fixed bottom-4 left-4 bg-gray-800 text-white p-4 rounded-lg opacity-75 hover:opacity-100 transition-opacity">
+      <div className="fixed bottom-4 left-4 flex gap-4 bg-gray-800 text-white p-4 rounded-lg opacity-75 hover:opacity-100 transition-opacity">
         <RemoteVideo stream={remoteStream} />
+        <RemoteVideo stream={localStream} />
       </div>
-    )
-  }
+    );
+  };
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -61,7 +61,7 @@ function RouteComponent2() {
       <p className="text-xl text-skin-base">rtcStatus: {rtcStatus}</p>
       <br />
       {renderMainContent()}
-      {renderRemoteStream()}
+      {renderStreams()}
     </div>
   );
 }
