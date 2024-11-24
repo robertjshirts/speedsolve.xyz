@@ -53,17 +53,20 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
     console.log("got local stream");
     setLocalStream(stream);
     // Push tracks to peer connection
-    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+    stream.getTracks().forEach(track => {
+      console.log("adding track to peer connection", track);
+      pc.addTrack(track, stream)
+    });
 
     // Set up event listeners
     pc.ontrack = (e) => {
+      console.log("track received", e.streams);
       const [remoteStream] = e.streams;
       setRemoteStream(remoteStream);
     };
 
     // Listen for ICE candidates
     pc.onicecandidate = (e) => {
-      console.log("ice candidate", e.candidate);
       if (e.candidate) {
         sendMessage('rtc_candidate', { candidate: e.candidate });
       }
@@ -84,6 +87,7 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
         case "closed":
         case "disconnected":
         case "failed":
+          console.log("rtc connection state: ", pc.connectionState);
           setRtcStatus("disconnected");
           break;
       }
