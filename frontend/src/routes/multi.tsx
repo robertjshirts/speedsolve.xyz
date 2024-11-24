@@ -5,7 +5,7 @@ import { MultiResult } from '../components/MultiResult'
 import { Login } from '../components/Login'
 import { useAuth } from '../hooks/useAuth'
 import { useMultiStore } from '../store'
-import { useMulti2 } from '../hooks/useMulti2'
+import { useMultiCompetition } from '../hooks/useMultiCompetition'
 import { Video } from '../components/Video'
 import { MultiConnection } from '../components/MultiConnection'
 import { MultiIdle } from '../components/MultiIdle'
@@ -13,6 +13,7 @@ import { MultiQueue } from '../components/MultiQueue'
 import { MultiRTC } from '../components/MultiRTC'
 import { MultiScramble } from '../components/MultiScramble'
 import { MultiCountdown } from '../components/MultiCountdown'
+import { MultiSolve } from '../components/MultiSolve'
 
 export const Route = createFileRoute('/multi')({
   component: RouteComponent2,
@@ -21,7 +22,15 @@ export const Route = createFileRoute('/multi')({
 function RouteComponent2() {
   const { isAuthenticated } = useAuth();
   const { wsStatus, compState, rtcStatus, remoteStream, localStream } = useMultiStore();
-  const { connect, disconnect, startQueue, cancelQueue, finishScramble, startCountdown, cancelCountdown } = useMulti2();
+  const { 
+    connect, 
+    disconnect, 
+    startQueue, 
+    cancelQueue, 
+    finishScramble, 
+    startCountdown, 
+    cancelCountdown,
+    finishSolve } = useMultiCompetition();
 
   if (!isAuthenticated) {
     return (
@@ -42,6 +51,7 @@ function RouteComponent2() {
       case 'connecting': return <MultiRTC />;
       case 'scrambling': return <MultiScramble finishScramble={finishScramble} />;
       case 'countdown': return <MultiCountdown startCountdown={startCountdown} cancelCountdown={cancelCountdown} />;
+      case 'solving': return <MultiSolve finishSolve={finishSolve} />;
     }
   };
 

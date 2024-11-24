@@ -11,6 +11,8 @@ type MultiState = {
   remoteStream: MediaStream | null;
   scramble: string | null;
   countdownStarted: boolean;
+  startTime: number | null;
+  endTime: number | null;
   error: string | null;
   peers: Record<string, PeerStatus>;
 }
@@ -23,6 +25,8 @@ type MultiActions = {
   setRemoteStream: (stream: MediaStream | null) => void;
   setScramble: (scramble: string) => void;
   setCountdownStarted: (started: boolean) => void;
+  setStartTime: () => void;
+  setEndTime: () => void;
   setError: (error: string | null) => void;
   setPeerStatus: (peer: string, status: PeerStatus) => void;
   resetPeers: () => void;
@@ -37,6 +41,8 @@ const initialMultiState: MultiState = {
   remoteStream: null,
   scramble: '',
   countdownStarted: false,
+  startTime: null,
+  endTime: null,
   error: null,
   peers: {},
 };
@@ -50,6 +56,8 @@ export const useMultiStore = create<MultiState & MultiActions>((set) => ({
   setRemoteStream: (stream) => set({ remoteStream: stream }),
   setScramble: (scramble) => set({ scramble }),
   setCountdownStarted: (started) => set({ countdownStarted: started }),
+  setStartTime: () => set({ startTime: Date.now() }),
+  setEndTime: () => set({ endTime: Date.now() }),
   setError: (error) => set({ error }),
   setPeerStatus: (peer, status) => set((state) => ({ peers: { ...state.peers, [peer]: status } })),
   resetPeers: () => set({ peers: {} }),
