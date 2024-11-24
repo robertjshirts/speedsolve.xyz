@@ -9,11 +9,23 @@ export type Profile = {
 }
 
 export type PeerStatus = "peer_ready" | "peer_unready" | "peer_disconnected";
-export type RTCStatus = "connected" | "connecting" | "disconnected" | "closed" | "failed";
 export type WSStatus = "connecting" | "connected" | "disconnected";
+export type RTCStatus = "connected" | "connecting" | "disconnected" | "closed" | "failed";
+export interface RTCState {
+  rtcStatus: RTCStatus;
+  localStream: MediaStream | null;
+  remoteStream: MediaStream | null;
+}
+
+export interface MultiState {
+  scramble?: string;
+  results: Record<string, Result>;
+  peers: Record<string, PeerStatus>;
+  rtcState: RTCState;
+}
 
 // types.ts
-export type SessionState = "queuing" | "connecting" | "scrambling" | "countdown" | "solving" | "results";
+export type CompetitionState = "queuing" | "connecting" | "scrambling" | "countdown" | "solving" | "results";
 
 export type CubeType = "3x3" | "2x2";
 

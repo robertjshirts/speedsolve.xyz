@@ -1,10 +1,8 @@
-// components/Login.tsx
-import { useAuth0 } from '@auth0/auth0-react'
 import { Link } from '@tanstack/react-router'
+import { useAuth } from '../hooks/useAuth'
 
 export function Login() {
-  // Simulating auth check with console log
-  const { isAuthenticated, loginWithRedirect, user, logout, isLoading } = useAuth0()
+  const { isAuthenticated, loginWithRedirect, user, logout, isLoading } = useAuth()
   console.log('Checking auth status...')
 
   if (isLoading) {
@@ -33,7 +31,7 @@ export function Login() {
         {String(user!["username"])}
       </Link>
       <button
-        onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+        onClick={logout}
         className="px-4 py-2 bg-skin-accent text-skin-base rounded hover:bg-skin-primary transition duration-150 ease-in-out"
       >
         Logout

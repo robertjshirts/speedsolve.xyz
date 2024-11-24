@@ -1,60 +1,77 @@
 import { useRef, useCallback, useState } from 'react';
 import { MultiClientMessageType, RTCStatus } from '../types';
+import { useMultiStore } from '../store';
 
 interface UseWebRTCReturn {
   startConnection: (isOfferer: boolean) => void;
   handleRTCMessage: (type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate', payload: any) => void;
-  rtcStatus: RTCStatus;
 }
 
-
 export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: Record<string, any>) => void): UseWebRTCReturn {
-  const peerConnection = useRef<RTCPeerConnection | null>(null);
-  const [rtcStatus, setRtcStatus] = useState<RTCStatus>('disconnected');
+  const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const { setRtcStatus, setRemoteStream, setLocalStream } = useMultiStore(state => state);
 
-  const createPeerConnection = useCallback(() => {
-    // Create a new RTCPeerConnection
-    const turnUsername = import.meta.env.VITE_TURN_USERNAME!;
-    const turnCredential = import.meta.env.VITE_TURN_CREDENTIAL!;
-    const pc = new RTCPeerConnection({
-      iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302",
-        }
-        // {
-        //   urls: "stun:stun.relay.metered.ca:80",
-        // },
-        // {
-        //   urls: "turn:global.relay.metered.ca:80",
-        //   username: turnUsername,
-        //   credential: turnCredential,
-        // },
-        // {
-        //   urls: "turn:global.relay.metered.ca:80?transport=tcp",
-        //   username: turnUsername,
-        //   credential: turnCredential,
-        // },
-        // {
-        //   urls: "turn:global.relay.metered.ca:443",
-        //   username: turnUsername,
-        //   credential: turnCredential,
-        // },
-        // {
-        //   urls: "turns:global.relay.metered.ca:443?transport=tcp",
-        //   username: turnUsername,
-        //   credential: turnCredential,
-        // },
-      ], 
-    });
+  const handleRTCMessage = useCallback(async (type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate', payload: Record<string, any>) => {
+    const pc = peerConnectionRef.current;
+    if (!pc) return console.error('No peer connection could be found or created in handleRTCMessage');
 
-    // Handle RTC events
+    if (!payload) return console.error(`No payload in message of type '${type}'`);
+    switch (type) {
+      case 'rtc_offer':
+        // Set remote description
+        console.log('rtc_offer received');
+        await pc.setRemoteDescription(new RTCSessionDescription(payload.offer!));
+
+        // Create local description
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        sendMessage('rtc_answer', { answer });
+        console.log("rtc_answer sent");
+        break;
+      case 'rtc_answer':
+        console.log('rtc_answer received');
+        await pc.setRemoteDescription(new RTCSessionDescription(payload.answer!));
+        break;
+      case 'rtc_candidate':
+        console.log('rtc_candidate received');
+        await pc.addIceCandidate(new RTCIceCandidate(payload.candidate!));
+        break;
+    }
+  }, [peerConnectionRef, sendMessage]);
+
+  const startConnection = useCallback(async (isOfferer: boolean) => {
+    const iceServers = await fetch(import.meta.env.VITE_ICE_SERVERS_URL).then(res => res.json());
+    const pc = new RTCPeerConnection({ iceServers });
+
+    // Get local media stream
+    const stream = await navigator.mediaDevices.getUserMedia({ video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        frameRate: { ideal: 30 },
+      }, audio: true });
+    if (!stream) return console.error('No local stream could be found or created in startConnection');
+    console.log("got local stream");
+    setLocalStream(stream);
+    // Push tracks to peer connection
+    stream.getTracks().forEach(track => pc.addTrack(track, stream));
+
+    // Set up event listeners
+    pc.ontrack = (e) => {
+      const [remoteStream] = e.streams;
+      setRemoteStream(remoteStream);
+    };
+
+    // Listen for ICE candidates
     pc.onicecandidate = (e) => {
+      console.log("ice candidate", e.candidate);
       if (e.candidate) {
-        sendMessage('rtc_candidate', e.candidate);
+        sendMessage('rtc_candidate', { candidate: e.candidate });
       }
     };
 
+    // Listen for connection state changes
     pc.onconnectionstatechange = () => {
+      console.log("connection state changed", pc.connectionState);
       switch (pc.connectionState) {
         case "new":
         case "connecting":
@@ -64,58 +81,23 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
           setRtcStatus("connected");
           sendMessage('rtc_connected');
           break;
+        case "closed":
         case "disconnected":
+        case "failed":
           setRtcStatus("disconnected");
           break;
-        case "closed":
-          setRtcStatus("closed");
-          break;
-        case "failed":
-          setRtcStatus("failed");
-          break;
       }
-      sendMessage('rtc_connected');
     };
 
-    peerConnection.current = pc;
-    return pc;
+    // Create offer and start connection logic
+    if (isOfferer) {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      sendMessage('rtc_offer', { offer });
+      console.log("rtc_offer sent")
+    }
   }, [sendMessage]);
 
-  const handleRTCMessage = useCallback(async (type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate', payload: any) => {
-    const pc = peerConnection.current || createPeerConnection();
-
-    // TODO: remove console.log
-    switch (type) {
-      case 'rtc_offer':
-        console.log('received offer', payload);
-        await pc.setRemoteDescription(payload);
-        console.log('creating answer');
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        sendMessage('rtc_answer', answer);
-        break;
-      case 'rtc_answer':
-        console.log('received answer', payload);
-        await pc.setRemoteDescription(payload);
-        break;
-      case 'rtc_candidate':
-        console.log('received candidate', payload);
-        await pc.addIceCandidate(payload);
-        break;
-    }
-  }, [createPeerConnection])
-
-  const startConnection = useCallback((isOfferer: boolean) => {
-    const pc = peerConnection.current || createPeerConnection();
-
-    if (isOfferer) {
-      pc.createOffer().then(offer => {
-        console.log("created offer", offer);
-        pc.setLocalDescription(offer);
-        sendMessage('rtc_offer', offer);
-      });
-    }
-  }, [createPeerConnection, sendMessage]);
-
-  return { handleRTCMessage, startConnection, rtcStatus };
+  return { handleRTCMessage, startConnection };
 }

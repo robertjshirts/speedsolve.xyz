@@ -1,7 +1,7 @@
 // components/ProfileCard.tsx
 import { Pencil } from 'lucide-react';
 import { Modal } from './Modal';
-import { useAuth0 } from '@auth0/auth0-react';
+import { useAuth } from '../hooks/useAuth';
 import { useState } from 'react';
 import { ProfileUpdateForm } from './ProfileUpdateForm';
 
@@ -12,7 +12,7 @@ interface ProfileCardProps {
 
 export function ProfileCard({ user, onProfileUpdate }: ProfileCardProps) {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const { user: authUser } = useAuth0();
+  const { user: authUser } = useAuth();
   const { username, email, bio, pfp, createdAt, updatedAt } = user;
 
   const isOwnProfile = authUser?.email === email;
