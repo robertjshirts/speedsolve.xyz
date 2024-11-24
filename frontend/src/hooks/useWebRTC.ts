@@ -7,22 +7,57 @@ interface UseWebRTCReturn {
   handleRTCMessage: (type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate', payload: any) => void;
 }
 
+interface QueuedMessage {
+  type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate';
+  payload: Record<string, any>;
+}
+
 export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: Record<string, any>) => void): UseWebRTCReturn {
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
+  const messageQueueRef = useRef<QueuedMessage[]>([]);
   const { setRtcStatus, setRemoteStream, setLocalStream } = useMultiStore(state => state);
 
-  const handleRTCMessage = useCallback(async (type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate', payload: Record<string, any>) => {
+  const processQueuedMessages = useCallback(async () => {
     const pc = peerConnectionRef.current;
-    if (!pc) return console.error('No peer connection could be found or created in handleRTCMessage');
+    if (!pc) return;
 
+    while (messageQueueRef.current.length > 0) {
+      const message = messageQueueRef.current.shift();
+      if (!message) continue;
+
+      switch (message.type) {
+        case 'rtc_offer':
+          await pc.setRemoteDescription(new RTCSessionDescription(message.payload.offer!));
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          sendMessage('rtc_answer', { answer });
+          console.log("rtc_answer sent (from queue)");
+          break;
+        case 'rtc_answer':
+          await pc.setRemoteDescription(new RTCSessionDescription(message.payload.answer!));
+          break;
+        case 'rtc_candidate':
+          await pc.addIceCandidate(new RTCIceCandidate(message.payload.candidate!));
+          break;
+      }
+    }
+  }, [sendMessage]);
+
+  const handleRTCMessage = useCallback(async (type: 'rtc_offer' | 'rtc_answer' | 'rtc_candidate', payload: Record<string, any>) => {
     if (!payload) return console.error(`No payload in message of type '${type}'`);
+
+    // If peer connection isn't ready, queue the message
+    if (!peerConnectionRef.current) {
+      console.log(`Queueing ${type} message as peer connection isn't ready`);
+      messageQueueRef.current.push({ type, payload });
+      return;
+    }
+
+    const pc = peerConnectionRef.current;
     switch (type) {
       case 'rtc_offer':
-        // Set remote description
         console.log('rtc_offer received');
         await pc.setRemoteDescription(new RTCSessionDescription(payload.offer!));
-
-        // Create local description
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         sendMessage('rtc_answer', { answer });
@@ -93,6 +128,11 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
       }
     };
 
+    peerConnectionRef.current = pc;
+
+    // Process any queued messages
+    await processQueuedMessages();
+
     // Create offer and start connection logic
     if (isOfferer) {
       const offer = await pc.createOffer();
@@ -101,7 +141,7 @@ export function useWebRTC(sendMessage: (type: MultiClientMessageType, payload?: 
       sendMessage('rtc_offer', { offer });
       console.log("rtc_offer sent")
     }
-  }, [sendMessage]);
+  }, [sendMessage, processQueuedMessages]);
 
   return { handleRTCMessage, startConnection };
 }
