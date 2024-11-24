@@ -24,7 +24,7 @@ type MultiActions = {
   setScramble: (scramble: string) => void;
   setCountdownStarted: (started: boolean) => void;
   setError: (error: string | null) => void;
-  setPeerStatus: (username: string, status: PeerStatus) => void;
+  setPeerStatus: (peer: string, status: PeerStatus) => void;
   resetPeers: () => void;
   reset: () => void;
 }
@@ -51,7 +51,7 @@ export const useMultiStore = create<MultiState & MultiActions>((set) => ({
   setScramble: (scramble) => set({ scramble }),
   setCountdownStarted: (started) => set({ countdownStarted: started }),
   setError: (error) => set({ error }),
-  setPeerStatus: (username, status) => set((state) => ({ peers: { ...state.peers, [username]: status } })),
+  setPeerStatus: (peer, status) => set((state) => ({ peers: { ...state.peers, [peer]: status } })),
   resetPeers: () => set({ peers: {} }),
   reset: () => set(initialMultiState),
 }));

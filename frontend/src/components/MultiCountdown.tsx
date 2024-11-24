@@ -14,7 +14,7 @@ export const MultiCountdown = ({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !e.repeat) {
+      if (e.code === 'Space' && !e.repeat && !isReady) {
         setIsReady(true);
         startCountdown();
       }
@@ -35,9 +35,13 @@ export const MultiCountdown = ({
     };
   }, [startCountdown, cancelCountdown]);
 
-  const unreadyPeers = Object.entries(peers)
-    .filter(([_, status]) => status !== 'ready')
-    .map(([peer]) => peer);
+  const unreadyPeers: string[] = [];
+  console.log("peers: ", peers);
+  for (const [username, status] of Object.entries(peers)) {
+    if (status !== 'ready') {
+      unreadyPeers.push(username);
+    }
+  } 
 
   const getMessage = () => {
     if (countdownStarted) {

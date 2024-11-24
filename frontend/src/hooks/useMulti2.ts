@@ -61,8 +61,8 @@ export function useMulti2() {
         break;
       }
       case 'peer_update': {
-        const newPeer = message.payload as { username: string, status: PeerStatus };
-        multiStore.setPeerStatus(newPeer.username, newPeer.status);
+        const newPeer = message.payload as { peer: string, status: PeerStatus };
+        multiStore.setPeerStatus(newPeer.peer, newPeer.status);
         break;
       };
       case 'countdown_started': {
