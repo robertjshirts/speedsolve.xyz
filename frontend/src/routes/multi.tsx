@@ -6,7 +6,7 @@ import { Login } from '../components/Login'
 import { useAuth } from '../hooks/useAuth'
 import { useMultiStore } from '../store'
 import { useMulti2 } from '../hooks/useMulti2'
-import { RemoteVideo } from '../components/Video'
+import { Video } from '../components/Video'
 
 export const Route = createFileRoute('/multi')({
   component: RouteComponent2,
@@ -45,8 +45,8 @@ function RouteComponent2() {
     if (compState === 'queuing' || compState === 'connecting') return null;
     return (
       <div className="fixed bottom-4 left-4 flex gap-4 bg-gray-800 text-white p-4 rounded-lg opacity-75 hover:opacity-100 transition-opacity">
-        <Video stream={remoteStream, } />
-        <Video stream={localStream} />
+        <Video stream={remoteStream} muted={false} />
+        <Video stream={localStream} muted={true} />
       </div>
     );
   };
