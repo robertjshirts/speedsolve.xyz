@@ -6,14 +6,14 @@ export const MultiScramble = ({ finishScramble }: { finishScramble: () => void }
   const scramble = useMultiStore(state => state.scramble);
 
   return (
-    <div className="flex flex-col items-center">
-        <>
-          <Scramble scramble={scramble!} />
-          <CubePreview3d scramble={scramble!} />
-        </>
+    <div className="flex flex-col items-center gap-8">
+      <Scramble scramble={scramble!} />
+      <div className="h-[400px] w-[400px]">
+        <CubePreview3d scramble={scramble!} />
+      </div>
       <button
         onClick={finishScramble}
-        className="mt-4 bg-green-500 text-white px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
+        className="bg-green-500 text-white px-6 py-3 rounded-lg hover:opacity-90 transition-opacity"
       >
         Ready to solve
       </button>

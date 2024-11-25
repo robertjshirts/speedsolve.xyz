@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import { useTimeFormat } from '../hooks/useTimeFormat';
 import { useMultiStore } from '../store';
 
-export function Timer() {
+export function Timer({ startTime }: { startTime: number }) {
   const { formatTime } = useTimeFormat();
-  const startTime = useMultiStore(state => state.startTime);
   const endTime = useMultiStore(state => state.endTime);
   const [time, setTime] = useState(startTime!);
 

@@ -33,7 +33,7 @@ export function useMultiCompetition() {
     };
 
     wsRef.current.onclose = (ev) => {
-      console.log('Connection closed:' + ev.reason);
+      if (ev.reason) console.log('Connection closed:' + ev.reason);
       if (wsRef.current) wsRef.current = null;
       multiStore.setWsStatus('disconnected');
     }
@@ -47,8 +47,8 @@ export function useMultiCompetition() {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       endConnection();
       wsRef.current.close();
-      multiStore.reset();
     }
+    multiStore.reset();
   };
 
   const handleMessage = (message: MultiServerMessage) => {
@@ -86,6 +86,11 @@ export function useMultiCompetition() {
       }
       case 'session_ended': {
         multiStore.reset();
+        break;
+      }
+      case 'error': {
+        const error = message.payload!.error as string;
+        multiStore.setError(error);
         break;
       }
       default: {

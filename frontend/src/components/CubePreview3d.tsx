@@ -313,30 +313,28 @@ export const CubePreview3d: React.FC<RubiksCube3DProps> = ({ scramble = '' }) =>
   }, [scramble, processMove]);
 
   return (
-    <div className="fixed bottom-4 right-4 w-96 h-96 bg-gradient-to-br from-gray-800 to-gray-900 rounded-lg border-2 border-blue-500 shadow-xl p-4">
+    <div 
+      className="relative w-full h-full cursor-move"
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+    >
       <div 
-        className="relative w-full h-full cursor-move"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        className="absolute top-1/2 left-1/2 w-64 h-64"
+        style={{
+          transform: `rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`,
+          transformStyle: 'preserve-3d',
+          transformOrigin: 'center',
+          margin: '-128px 0 0 -128px'
+        }}
       >
-        <div 
-          className="absolute top-1/2 left-1/2 w-64 h-64"
-          style={{
-            transform: `rotateX( ${rotation.x}deg) rotateY(${rotation.y}deg)`,
-            transformStyle: 'preserve-3d',
-            transformOrigin: 'center',
-            margin: '-128px 0 0 -128px'
-          }}
-        >
-          <Face colors={cubeState.front} transform="translateZ(64px)" />
-          <Face colors={cubeState.back} transform="translateZ(-64px) rotateY(180deg)" />
-          <Face colors={cubeState.right} transform="translateX(64px) rotateY(90deg)" />
-          <Face colors={cubeState.left} transform="translateX(-64px) rotateY(-90deg)" />
-          <Face colors={cubeState.top} transform="translateY(-64px) rotateX(90deg)" />
-          <Face colors={cubeState.bottom} transform="translateY(64px) rotateX(-90deg)" />
-        </div>
+        <Face colors={cubeState.front} transform="translateZ(64px)" />
+        <Face colors={cubeState.back} transform="translateZ(-64px) rotateY(180deg)" />
+        <Face colors={cubeState.right} transform="translateX(64px) rotateY(90deg)" />
+        <Face colors={cubeState.left} transform="translateX(-64px) rotateY(-90deg)" />
+        <Face colors={cubeState.top} transform="translateY(-64px) rotateX(90deg)" />
+        <Face colors={cubeState.bottom} transform="translateY(64px) rotateX(-90deg)" />
       </div>
     </div>
   );

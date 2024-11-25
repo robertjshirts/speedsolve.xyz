@@ -69,6 +69,49 @@ export const useMultiStore = create<MultiState & MultiActions>((set) => ({
   reset: () => set(initialMultiState),
 }));
 
+type SoloState = {
+  wsStatus: 'disconnected' | 'connecting' | 'connected';
+  compState: CompetitionState | null;
+  rtcStatus: 'connected' | 'connecting' | 'disconnected';
+  scramble: string | null;
+  startTime: number | null;
+  result: Result | null;
+  error: string | null;
+}
+
+type SoloActions = {
+  setWsStatus: (status: 'disconnected' | 'connecting' | 'connected') => void;
+  setCompState: (state: CompetitionState | null) => void;
+  setRtcStatus: (status: 'connected' | 'connecting' | 'disconnected') => void;
+  setScramble: (scramble: string) => void;
+  setStartTime: (time: number | null) => void;
+  setResult: (result: Result) => void;
+  setError: (error: string | null) => void;
+  reset: () => void;
+};
+
+const initialSoloState: SoloState = {
+  wsStatus: 'disconnected',
+  compState: null,
+  rtcStatus: 'disconnected',
+  scramble: null,
+  startTime: null,
+  result: null,
+  error: null,
+};
+
+export const useSoloStore = create<SoloState & SoloActions>((set) => ({
+  ...initialSoloState,
+  setWsStatus: (status) => set({ wsStatus: status }),
+  setCompState: (state) => set({ compState: state }),
+  setRtcStatus: (status) => set({ rtcStatus: status }),
+  setScramble: (scramble) => set({ scramble }),
+  setStartTime: (time) => set({ startTime: time }),
+  setResult: (result) => set({ result }),
+  setError: (error) => set({ error }),
+  reset: () => set(initialSoloState),
+}));
+
 type UserStore = {
   isAuthenticated: boolean;
   isLoading: boolean;

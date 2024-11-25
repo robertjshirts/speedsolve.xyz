@@ -1,13 +1,13 @@
-import { useMultiStore } from "../store";
+import { useSoloStore } from '../store'
 
-export const MultiConnection = ({ 
-  connect, 
-  disconnect 
-}: { 
+export const SoloConnection = ({
+  connect,
+  disconnect,
+}: {
   connect: () => void;
   disconnect: () => void;
 }) => {
-  const wsStatus = useMultiStore(state => state.wsStatus);
+  const wsStatus = useSoloStore(state => state.wsStatus);
   if (wsStatus === 'disconnected') {
     return (
       <div className="flex flex-col items-center justify-center h-[59vh]">
@@ -38,4 +38,4 @@ export const MultiConnection = ({
   }
 
   return null
-};
+}

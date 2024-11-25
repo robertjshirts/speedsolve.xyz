@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
-import { useMultiStore } from '../store';
+import { useSoloStore } from '../store';
 import { Timer } from './Timer';
 
-export const MultiSolve = ({ finishSolve }: { finishSolve: () => void }) => {
-  const startTime = useMultiStore(state => state.startTime);
+export const SoloSolve = ({ finishSolve }: { finishSolve: () => void }) => {
+  const startTime = useSoloStore(state => state.startTime);
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'Space' && !e.repeat) {
