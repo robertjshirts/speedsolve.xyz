@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { User } from '@auth0/auth0-react';
-import { CompetitionState, PeerStatus } from './types';
+import { CompetitionState, PeerStatus, Result } from './types';
 
 
 type MultiState = {
@@ -13,6 +13,7 @@ type MultiState = {
   countdownStarted: boolean;
   startTime: number | null;
   endTime: number | null;
+  results: Record<string, Result>;
   error: string | null;
   peers: Record<string, PeerStatus>;
 }
@@ -25,8 +26,9 @@ type MultiActions = {
   setRemoteStream: (stream: MediaStream | null) => void;
   setScramble: (scramble: string) => void;
   setCountdownStarted: (started: boolean) => void;
-  setStartTime: () => void;
-  setEndTime: () => void;
+  setStartTime: (time: number | null) => void;
+  setEndTime: (time: number | null) => void;
+  setResults: (results: Record<string, Result>) => void;
   setError: (error: string | null) => void;
   setPeerStatus: (peer: string, status: PeerStatus) => void;
   resetPeers: () => void;
@@ -43,6 +45,7 @@ const initialMultiState: MultiState = {
   countdownStarted: false,
   startTime: null,
   endTime: null,
+  results: {},
   error: null,
   peers: {},
 };
@@ -56,8 +59,10 @@ export const useMultiStore = create<MultiState & MultiActions>((set) => ({
   setRemoteStream: (stream) => set({ remoteStream: stream }),
   setScramble: (scramble) => set({ scramble }),
   setCountdownStarted: (started) => set({ countdownStarted: started }),
-  setStartTime: () => set({ startTime: Date.now() }),
-  setEndTime: () => set({ endTime: Date.now() }),
+  setStartTime: (time) => set({ startTime: time }),
+  setEndTime: (time) => set({ endTime: time }),
+  setResults: (results) => set({ results }),
+
   setError: (error) => set({ error }),
   setPeerStatus: (peer, status) => set((state) => ({ peers: { ...state.peers, [peer]: status } })),
   resetPeers: () => set({ peers: {} }),

@@ -30,7 +30,9 @@ function RouteComponent2() {
     finishScramble, 
     startCountdown, 
     cancelCountdown,
-    finishSolve } = useMultiCompetition();
+    finishSolve,
+    applyPenalty
+  } = useMultiCompetition();
 
   if (!isAuthenticated) {
     return (
@@ -52,6 +54,7 @@ function RouteComponent2() {
       case 'scrambling': return <MultiScramble finishScramble={finishScramble} />;
       case 'countdown': return <MultiCountdown startCountdown={startCountdown} cancelCountdown={cancelCountdown} />;
       case 'solving': return <MultiSolve finishSolve={finishSolve} />;
+      case 'results': return <MultiResult applyPenalty={applyPenalty} startQueue={startQueue} />;
     }
   };
 
@@ -59,7 +62,7 @@ function RouteComponent2() {
     if (!compState || compState === 'queuing' || compState === 'connecting') return null;
     return (
       <div className="fixed bottom-4 left-4 flex gap-4 bg-gray-800 text-white p-4 rounded-lg opacity-75 hover:opacity-100 transition-opacity">
-        <Video stream={remoteStream} muted={false} />
+        <Video stream={remoteStream} muted={false} isRemote={true} />
         <Video stream={localStream} muted={true} />
       </div>
     );

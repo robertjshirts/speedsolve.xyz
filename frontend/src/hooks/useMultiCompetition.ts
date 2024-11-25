@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { useAuth } from "./useAuth";
 import { useMultiStore } from "../store";
 import { useWebRTC } from "./useWebRTC";
-import { MultiServerMessage, MultiClientMessageType, CompetitionState, PeerStatus } from "../types";
+import { MultiServerMessage, MultiClientMessageType, CompetitionState, PeerStatus, Result } from "../types";
 
 export function useMultiCompetition() {
   const multiStore = useMultiStore();
@@ -14,6 +14,7 @@ export function useMultiCompetition() {
 
   const connect = async () => {
     if (!isAuthenticated) throw new Error('User is not authenticated');
+    multiStore.reset();
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     const accessToken = await getAccessToken();
@@ -57,7 +58,11 @@ export function useMultiCompetition() {
         multiStore.setCompState(state);
         if (message.payload!.isOfferer) isOfferer.current = message.payload!.isOfferer as boolean;
         if (message.payload!.scramble) multiStore.setScramble(message.payload!.scramble as string);
-        // if (message.payload!.results) multiStore.setResults(message.payload!.results as Record<string, Result>);
+        if (message.payload!.results) multiStore.setResults(message.payload!.results as Record<string, Result>);
+        break;
+      }
+      case 'results_update': {
+        multiStore.setResults(message.payload!.results as Record<string, Result>);
         break;
       }
       case 'peer_update': {
@@ -106,7 +111,12 @@ export function useMultiCompetition() {
         startConnection(isOfferer.current);
         break;
       case 'solving':
-        multiStore.setStartTime();
+        multiStore.setCountdownStarted(false);
+        multiStore.setStartTime(Date.now());
+        break;
+      case 'results':
+        multiStore.setStartTime(null);
+        multiStore.setEndTime(null);
         break;
       case null:
         endConnection();
@@ -132,9 +142,10 @@ export function useMultiCompetition() {
     startCountdown: () => sendMessage('start_countdown'),
     cancelCountdown: () => sendMessage('cancel_countdown'),
     finishSolve: () => {
-      multiStore.setEndTime();
+      multiStore.setEndTime(Date.now());
       const time = Date.now() - multiStore.startTime!;
       sendMessage('finish_solve', { time });
     },
+    applyPenalty: (penalty: "none" | "plus2" | "DNF") => sendMessage('apply_penalty', { penalty }),
   };
 }
