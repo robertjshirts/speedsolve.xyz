@@ -2,8 +2,10 @@
 import { Link } from '@tanstack/react-router'
 import { Login } from "../components/Login";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { useAuth } from "../hooks/useAuth";
 
 export function Topbar() {
+  const { user } = useAuth();
   return (
     <div className="fixed top-0 z-50 w-full border-b-2 border-skin-accent bg-skin-fill">
       <div className="relative mx-auto flex max-w-screen-xl items-center justify-center px-4 py-3">
@@ -34,13 +36,13 @@ export function Topbar() {
             Multiplayer
           </Link>
           <Link
-            to="/"
+            to={`/p/${user ? user!["username"] : ''}`}
             className="text-skin-base hover:text-skin-accent transition duration-150 ease-in-out px-5"
             activeProps={{
               className: 'text-skin-accent'
             }}
           >
-            Leaderboard
+            Profile
           </Link>
         </div>
 

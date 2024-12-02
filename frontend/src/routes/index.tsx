@@ -37,7 +37,7 @@ export function MainPage() {
             </div>
             <h2 className="text-xl font-semibold text-skin-primary mb-4">Live Competitions</h2>
             <p className="text-skin-base">
-              Challenge other speedcubers in real-time with video chat <em>(coming soon)</em>
+              Challenge other speedcubers in real-time with video and audio chat
             </p>
           </div>
 
@@ -45,9 +45,9 @@ export function MainPage() {
             <div className="w-16 h-16 bg-skin-accent/10 rounded-lg flex items-center justify-center mx-auto mb-6">
               <Trophy className="w-8 h-8 text-skin-accent" />
             </div>
-            <h2 className="text-xl font-semibold text-skin-primary mb-4">Leaderboards</h2>
+            <h2 className="text-xl font-semibold text-skin-primary mb-4">Progress</h2>
             <p className="text-skin-base">
-              Track your progress and compete for the top spots in global rankings <em>(coming soon)</em>
+              Track your progress on your profile to see your average time and best solves
             </p>
           </div>
         </div>
