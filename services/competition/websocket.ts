@@ -11,12 +11,12 @@ const soloManager = new SoloManager();
 const multiManager = new MultiManager();
 
 router.get(
-    "/competition/health",
-    (ctx: RouterContext<"/competition/health">) => {
-        logger.debug("Health check");
-        ctx.response.status = STATUS_CODE.OK;
-        return;
-    },
+  "/competition/health",
+  (ctx: RouterContext<"/competition/health">) => {
+    logger.debug("Health check");
+    ctx.response.status = STATUS_CODE.OK;
+    return;
+  },
 );
 
 // Get user's solves
@@ -34,21 +34,38 @@ router.get(
       const limit = parseInt(ctx.request.url.searchParams.get("limit") ?? "20");
       const sortBy = ctx.request.url.searchParams.get("sortBy") ?? "created_at";
       const sortOrder = ctx.request.url.searchParams.get("sortOrder") ?? "desc";
-      const scramble = ctx.request.url.searchParams.get("scramble") ?? undefined;
-      const penaltyType = ctx.request.url.searchParams.get("penaltyType") as "DNF" | "plus2" | "none" | undefined;
-      const cubeType = ctx.request.url.searchParams.get("cubeType") as "3x3" | "2x2" | undefined;
+      const scramble = ctx.request.url.searchParams.get("scramble") ??
+        undefined;
+      const penaltyType = ctx.request.url.searchParams.get("penaltyType") as
+        | "DNF"
+        | "plus2"
+        | "none"
+        | undefined;
+      const cubeType = ctx.request.url.searchParams.get("cubeType") as
+        | "3x3"
+        | "2x2"
+        | undefined;
 
       const solves = await db.getUserSolves(
         ctx.params.username,
-        { page, limit, sortBy: sortBy as "time" | "created_at", sortOrder: sortOrder as "asc" | "desc" },
-        { scramble, penaltyType, cubeType }
+        {
+          page,
+          limit,
+          sortBy: sortBy as "time" | "created_at",
+          sortOrder: sortOrder as "asc" | "desc",
+        },
+        { scramble, penaltyType, cubeType },
       );
-      const avg = await db.getUserAverageTime(ctx.params.username, { scramble, penaltyType, cubeType });
+      const avg = await db.getUserAverageTime(ctx.params.username, {
+        scramble,
+        penaltyType,
+        cubeType,
+      });
 
       ctx.response.status = STATUS_CODE.OK;
       ctx.response.body = {
         average: avg,
-        solves
+        ...solves,
       };
     } catch (e) {
       logger.error("Error getting solves", { error: e });
@@ -58,7 +75,7 @@ router.get(
         details: e,
       };
     }
-  }
+  },
 );
 
 // Get solo session details
@@ -73,7 +90,7 @@ router.get(
 
     try {
       const session = await db.getSoloSession(ctx.params.sessionId);
-      
+
       if (!session) {
         ctx.response.status = STATUS_CODE.NotFound;
         ctx.response.body = { error: "Session not found" };
@@ -90,7 +107,7 @@ router.get(
         details: e,
       };
     }
-  }
+  },
 );
 
 // Get multi session details
@@ -105,7 +122,7 @@ router.get(
 
     try {
       const session = await db.getMultiSession(ctx.params.sessionId);
-      
+
       if (!session) {
         ctx.response.status = STATUS_CODE.NotFound;
         ctx.response.body = { error: "Session not found" };
@@ -122,7 +139,7 @@ router.get(
         details: e,
       };
     }
-  }
+  },
 );
 
 // Get solo sessions list
@@ -134,12 +151,21 @@ router.get(
       const limit = parseInt(ctx.request.url.searchParams.get("limit") ?? "20");
       const sortBy = ctx.request.url.searchParams.get("sortBy") ?? "created_at";
       const sortOrder = ctx.request.url.searchParams.get("sortOrder") ?? "desc";
-      const username = ctx.request.url.searchParams.get("username") ?? undefined;
-      const cubeType = ctx.request.url.searchParams.get("cubeType") as "3x3" | "2x2" | undefined;
+      const username = ctx.request.url.searchParams.get("username") ??
+        undefined;
+      const cubeType = ctx.request.url.searchParams.get("cubeType") as
+        | "3x3"
+        | "2x2"
+        | undefined;
 
       const sessions = await db.getSoloSessions(
-        { page, limit, sortBy: sortBy as "time" | "created_at", sortOrder: sortOrder as "asc" | "desc" },
-        { username, cubeType }
+        {
+          page,
+          limit,
+          sortBy: sortBy as "time" | "created_at",
+          sortOrder: sortOrder as "asc" | "desc",
+        },
+        { username, cubeType },
       );
 
       ctx.response.status = STATUS_CODE.OK;
@@ -152,7 +178,7 @@ router.get(
         details: e,
       };
     }
-  }
+  },
 );
 
 // Get multi sessions list
@@ -164,12 +190,21 @@ router.get(
       const limit = parseInt(ctx.request.url.searchParams.get("limit") ?? "20");
       const sortBy = ctx.request.url.searchParams.get("sortBy") ?? "created_at";
       const sortOrder = ctx.request.url.searchParams.get("sortOrder") ?? "desc";
-      const username = ctx.request.url.searchParams.get("username") ?? undefined;
-      const cubeType = ctx.request.url.searchParams.get("cubeType") as "3x3" | "2x2" | undefined;
+      const username = ctx.request.url.searchParams.get("username") ??
+        undefined;
+      const cubeType = ctx.request.url.searchParams.get("cubeType") as
+        | "3x3"
+        | "2x2"
+        | undefined;
 
       const sessions = await db.getMultiSessions(
-        { page, limit, sortBy: sortBy as "time" | "created_at", sortOrder: sortOrder as "asc" | "desc" },
-        { username, cubeType }
+        {
+          page,
+          limit,
+          sortBy: sortBy as "time" | "created_at",
+          sortOrder: sortOrder as "asc" | "desc",
+        },
+        { username, cubeType },
       );
 
       ctx.response.status = STATUS_CODE.OK;
@@ -182,49 +217,55 @@ router.get(
         details: e,
       };
     }
-  }
+  },
 );
 
 // Solo websocket endpoint
-router.get("/competition/ws/solo",
-    verifyAndParseJWT,
-    (ctx: RouterContext<"/competition/ws/solo">) => {
-        if (!ctx.isUpgradable) {
-            logger.error("Connection not upgradable", { username: ctx.state.username });
-            ctx.throw(
-                STATUS_CODE.BadRequest,
-                "Connection must upgrade to websocket!",
-            );
-        }
+router.get(
+  "/competition/ws/solo",
+  verifyAndParseJWT,
+  (ctx: RouterContext<"/competition/ws/solo">) => {
+    if (!ctx.isUpgradable) {
+      logger.error("Connection not upgradable", {
+        username: ctx.state.username,
+      });
+      ctx.throw(
+        STATUS_CODE.BadRequest,
+        "Connection must upgrade to websocket!",
+      );
+    }
 
-        const ws = ctx.upgrade();
-        const username = ctx.state.username;
-        ws.onopen = () => {
-            logger.info("Websocket connection opened", { username });
-            soloManager.addConnection(username, ws);
-        }
-    },
+    const ws = ctx.upgrade();
+    const username = ctx.state.username;
+    ws.onopen = () => {
+      logger.info("Websocket connection opened", { username });
+      soloManager.addConnection(username, ws);
+    };
+  },
 );
 
 // Multi websocket endpoint
-router.get("/competition/ws/multi",
-    verifyAndParseJWT,
-    (ctx: RouterContext<"/competition/ws/multi">) => {
-        if (!ctx.isUpgradable) {
-            logger.error("Connection not upgradable", { username: ctx.state.username });
-            ctx.throw(
-                STATUS_CODE.BadRequest,
-                "Connection must upgrade to websocket!",
-            );
-        }
+router.get(
+  "/competition/ws/multi",
+  verifyAndParseJWT,
+  (ctx: RouterContext<"/competition/ws/multi">) => {
+    if (!ctx.isUpgradable) {
+      logger.error("Connection not upgradable", {
+        username: ctx.state.username,
+      });
+      ctx.throw(
+        STATUS_CODE.BadRequest,
+        "Connection must upgrade to websocket!",
+      );
+    }
 
-        const ws = ctx.upgrade();
-        const username = ctx.state.username;
-        ws.onopen = () => {
-            logger.info("Websocket connection opened", { username });
-            multiManager.addConnection(username, ws);
-        }
-    },
+    const ws = ctx.upgrade();
+    const username = ctx.state.username;
+    ws.onopen = () => {
+      logger.info("Websocket connection opened", { username });
+      multiManager.addConnection(username, ws);
+    };
+  },
 );
 
 export default router;
