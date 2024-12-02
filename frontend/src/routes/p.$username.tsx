@@ -44,6 +44,17 @@ async function fetchSolves(username: string): Promise<SolveResponse> {
   return response.json();
 }
 
+function formatTime(solve: Solve): string {
+  if (solve.penalty === 'DNF') return 'DNF';
+  
+  const timeInSeconds = solve.penalty === 'plus2' 
+    ? (solve.time + 2000) / 1000
+    : solve.time / 1000;
+  
+  const formattedTime = timeInSeconds.toFixed(2);
+  return solve.penalty === 'plus2' ? `${formattedTime}+` : formattedTime;
+}
+
 export const Route = createFileRoute('/p/$username')({
   loader: async ({ params }) => {
     const [profile, solves] = await Promise.all([
@@ -55,6 +66,7 @@ export const Route = createFileRoute('/p/$username')({
   component: ProfilePage,
 });
 
+
 function ProfilePage() {
   const { profile, solves } = Route.useLoaderData();
   const [cubeType, setCubeType] = useState<'3x3' | '2x2'>('3x3');
@@ -64,10 +76,20 @@ function ProfilePage() {
   const filteredSolves = solves.records
     .filter(solve => solve.cube === cubeType)
     .sort((a, b) => {
-      const aValue = sortBy === 'time' ? a.time : new Date(a.created_at).getTime();
-      const bValue = sortBy === 'time' ? b.time : new Date(b.created_at).getTime();
+      const aValue = sortBy === 'time' ? 
+        (a.penalty === 'DNF' ? Infinity : a.penalty === 'plus2' ? a.time + 2000 : a.time) : 
+        new Date(a.created_at).getTime();
+      const bValue = sortBy === 'time' ? 
+        (b.penalty === 'DNF' ? Infinity : b.penalty === 'plus2' ? b.time + 2000 : b.time) : 
+        new Date(b.created_at).getTime();
       return sortOrder === 'asc' ? aValue - bValue : bValue - aValue;
     });
+
+  const bestTime = Math.min(
+    ...solves.records
+      .filter(s => s.penalty !== 'DNF')
+      .map(s => s.penalty === 'plus2' ? s.time + 2000 : s.time)
+  );
 
   return (
     <div className="container mx-auto p-4 space-y-6">
@@ -100,8 +122,7 @@ function ProfilePage() {
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
           <h2 className="text-lg font-semibold mb-2">Best Time</h2>
           <p className="text-2xl font-bold">
-            {Math.min(...solves.records.filter(s => s.penalty !== 'DNF')
-              .map(s => s.penalty === 'plus2' ? s.time + 2000 : s.time)) / 1000}s
+            {(bestTime / 1000).toFixed(2)}s
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow">
@@ -152,10 +173,7 @@ function ProfilePage() {
             >
               <div>
                 <p className="font-medium">
-                  {(solve.time / 1000).toFixed(2)}s 
-                  {solve.penalty !== 'none' && 
-                    <span className="text-red-500 ml-2">({solve.penalty})</span>
-                  }
+                  {formatTime(solve)}s
                 </p>
                 <p className="text-sm text-gray-500">{solve.scramble}</p>
               </div>
