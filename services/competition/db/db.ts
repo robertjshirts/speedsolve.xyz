@@ -3,6 +3,7 @@ import { and, asc, desc, eq, ilike, sql } from "drizzle-orm";
 import { solves, soloSessions, multiSessions, multiSessionSolves, profiles } from "./schema.ts";
 import { CubeType, Result } from "../types.ts";
 import pg from "pg";
+import { logger } from "../logger.ts";
 
 const { Pool } = pg;
 
@@ -49,6 +50,36 @@ interface SolveFilters {
   penaltyType?: "DNF" | "plus2" | "none";
   cubeType?: CubeType;
 }
+export async function getUserAverageTime(username: string, filters?: SolveFilters) {
+  const conditions = [eq(solves.username, username)];
+
+  // Add any additional filters
+  if (filters?.scramble) {
+    conditions.push(ilike(solves.scramble, `%${filters.scramble}%`));
+  }
+  if (filters?.penaltyType) {
+    conditions.push(eq(solves.penalty, filters.penaltyType));
+  }
+  if (filters?.cubeType) {
+    conditions.push(eq(solves.cube, filters.cubeType));
+  }
+
+  const result = await db.select({
+    average: sql<number>`
+      AVG(
+        CASE 
+          WHEN ${solves.penalty} = 'DNF' THEN null
+          WHEN ${solves.penalty} = 'plus2' THEN ${solves.time} + 2000
+          ELSE ${solves.time}
+        END
+      )
+    `
+  })
+    .from(solves)
+    .where(and(...conditions));
+
+  return result[0]?.average ?? null;
+}
 
 export async function getUserSolves(
   username: string,
@@ -94,14 +125,44 @@ export async function getUserSolves(
 }
 
 export async function getSoloSession(sessionId: string) {
-  const session = await db.select()
-    .from(soloSessions)
-    .where(eq(soloSessions.solo_session_id, sessionId))
-    .leftJoin(solves, eq(soloSessions.solve_id, solves.solve_id));
+  const [session, solve] = await Promise.all([
+    db.select()
+      .from(soloSessions)
+      .where(eq(soloSessions.solo_session_id, sessionId)),
+    db.select({
+      "solve_id": solves.solve_id,
+      "time": solves.time,
+      "username": solves.username,
+      "scramble": solves.scramble,
+      "penalty": solves.penalty,
+      "cube": solves.cube,
+      "created_at": solves.created_at
+      })
+      .from(solves)
+      // Join soloSessions on sessionId (pass the param)
+      .innerJoin(
+        soloSessions,
+        eq(
+          soloSessions.solo_session_id,
+          sessionId
+        ),
+      )
+      // Filter solves by session's solve_id
+      .where(
+        eq(
+          soloSessions.solve_id,
+          solves.solve_id
+        )
+      ),
+  ]);
+
 
   if (!session.length) return null;
 
-  return session[0];
+  return {
+    ...session[0],
+    solve: solve[0]
+  };
 }
 
 export async function getMultiSession(sessionId: string) {
@@ -109,10 +170,29 @@ export async function getMultiSession(sessionId: string) {
     db.select()
       .from(multiSessions)
       .where(eq(multiSessions.multi_session_id, sessionId)),
-    db.select()
-      .from(multiSessionSolves)
-      .where(eq(multiSessionSolves.multi_session_id, sessionId))
-      .leftJoin(solves, eq(multiSessionSolves.solve_id, solves.solve_id))
+    db.select({
+      "solve_id": solves.solve_id,
+      "time": solves.time,
+      "username": solves.username,
+      "scramble": solves.scramble,
+      "penalty": solves.penalty,
+      "cube": solves.cube,
+      "created_at": solves.created_at 
+      })
+      .from(solves)
+      .innerJoin(
+        multiSessionSolves,
+        eq(
+          multiSessionSolves.multi_session_id,
+          sessionId
+        ),
+      )
+      .where(
+        eq(
+          multiSessionSolves.solve_id,
+          solves.solve_id
+        )
+      )
   ]);
 
   if (!session.length) return null;
@@ -142,22 +222,39 @@ export async function getSoloSessions(
     conditions.push(eq(solves.cube, filters.cubeType));
   }
 
-  const orderClause = 
-  sortBy === "time" 
-    ? (sortOrder === "asc" ? asc(solves.time) : desc(solves.time))
-    : (sortOrder === "asc" ? asc(soloSessions.created_at) : desc(soloSessions.created_at));
-
   const [records, totalCount] = await Promise.all([
-    db.select()
+    db.select({
+      "session_id": soloSessions.solo_session_id,
+      "created_at": soloSessions.created_at,
+      "solve": {
+        "solve_id": solves.solve_id,
+        "time": solves.time,
+        "username": solves.username,
+        "scramble": solves.scramble,
+        "penalty": solves.penalty,
+        "cube": solves.cube,
+        "created_at": solves.created_at
+      }
+    })
       .from(soloSessions)
-      .leftJoin(solves, eq(soloSessions.solve_id, solves.solve_id))
+      .leftJoin(
+        solves,
+        eq(soloSessions.solve_id, solves.solve_id)
+      )
       .where(and(...conditions))
-      .orderBy(orderClause)
+      .orderBy(
+        sortBy === "time" 
+          ? (sortOrder === "asc" ? asc(solves.time) : desc(solves.time))
+          : (sortOrder === "asc" ? asc(soloSessions.created_at) : desc(soloSessions.created_at))
+      )
       .limit(limit)
       .offset(offset),
     db.select({ count: sql<number>`count(*)` })
       .from(soloSessions)
-      .leftJoin(solves, eq(soloSessions.solve_id, solves.solve_id))
+      .leftJoin(
+        solves,
+        eq(soloSessions.solve_id, solves.solve_id)
+      )
       .where(and(...conditions))
   ]);
 
@@ -171,7 +268,6 @@ export async function getSoloSessions(
     }
   };
 }
-
 export async function getMultiSessions(
   { page = 1, limit = 20, sortBy = "created_at", sortOrder = "desc" }: PaginationParams,
   filters?: SessionFilters
@@ -186,29 +282,65 @@ export async function getMultiSessions(
     conditions.push(eq(solves.cube, filters.cubeType));
   }
 
-  const orderClause = 
-    sortBy === "time" 
-      ? (sortOrder === "asc" ? asc(solves.time) : desc(solves.time))
-      : (sortOrder === "asc" ? asc(multiSessions.created_at) : desc(multiSessions.created_at));
+  // Create subquery for solves
+  const solvesSubquery = db.$with('session_solves').as(
+    db.select({
+      "solve_id": solves.solve_id,
+      "time": solves.time,
+      "username": solves.username,
+      "scramble": solves.scramble,
+      "penalty": solves.penalty,
+      "cube": solves.cube,
+      "created_at": solves.created_at,
+      "multi_session_id": multiSessionSolves.multi_session_id
+    })
+    .from(solves)
+    .innerJoin(
+      multiSessionSolves,
+      eq(multiSessionSolves.solve_id, solves.solve_id)
+    )
+  );
 
   const [records, totalCount] = await Promise.all([
-    db.select()
+    db.with(solvesSubquery)
+      .select({
+        "session_id": multiSessions.multi_session_id,
+        "winner": multiSessions.winner,
+        "created_at": multiSessions.created_at,
+        "solves": sql<any>`json_agg(session_solves.*)`
+      })
       .from(multiSessions)
-      .leftJoin(multiSessionSolves, eq(multiSessions.multi_session_id, multiSessionSolves.multi_session_id))
-      .leftJoin(solves, eq(multiSessionSolves.solve_id, solves.solve_id))
+      .leftJoin(
+        solvesSubquery,
+        eq(solvesSubquery.multi_session_id, multiSessions.multi_session_id)
+      )
       .where(and(...conditions))
-      .orderBy(orderClause)
+      .groupBy(multiSessions.multi_session_id)
+      .orderBy(
+        sortBy === "time"
+          ? (sortOrder === "asc" ? asc(solves.time) : desc(solves.time))
+          : (sortOrder === "asc" ? asc(multiSessions.created_at) : desc(multiSessions.created_at))
+      )
       .limit(limit)
       .offset(offset),
     db.select({ count: sql<number>`count(*)` })
       .from(multiSessions)
-      .leftJoin(multiSessionSolves, eq(multiSessions.multi_session_id, multiSessionSolves.multi_session_id))
-      .leftJoin(solves, eq(multiSessionSolves.solve_id, solves.solve_id))
+      .leftJoin(
+        multiSessionSolves,
+        eq(multiSessions.multi_session_id, multiSessionSolves.multi_session_id)
+      )
+      .leftJoin(
+        solves,
+        eq(multiSessionSolves.solve_id, solves.solve_id)
+      )
       .where(and(...conditions))
   ]);
 
   return {
-    records,
+    records: records.map(record => ({
+      ...record,
+      solves: record.solves || []
+    })),
     pagination: {
       total: totalCount[0].count,
       page,

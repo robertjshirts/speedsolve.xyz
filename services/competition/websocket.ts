@@ -43,9 +43,13 @@ router.get(
         { page, limit, sortBy: sortBy as "time" | "created_at", sortOrder: sortOrder as "asc" | "desc" },
         { scramble, penaltyType, cubeType }
       );
+      const avg = await db.getUserAverageTime(ctx.params.username, { scramble, penaltyType, cubeType });
 
       ctx.response.status = STATUS_CODE.OK;
-      ctx.response.body = solves;
+      ctx.response.body = {
+        average: avg,
+        solves
+      };
     } catch (e) {
       logger.error("Error getting solves", { error: e });
       ctx.response.status = STATUS_CODE.InternalServerError;
