@@ -175,7 +175,6 @@ function ProfilePage() {
                 <p className="font-medium">
                   {formatTime(solve)}s
                 </p>
-                <p className="text-sm text-gray-500">{solve.scramble}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-gray-500">
