@@ -53,7 +53,7 @@ export const MultiCountdown = ({
       msg += 'Press space to ready up';
     }
     if (unreadyPeers.length > 0) {
-      if (msg) msg += '\n';
+      if (msg) msg += ' | ';
       const names = unreadyPeers.join(', ');
       msg += `${names} ${unreadyPeers.length === 1 ? 'is' : 'are'} not ready`;
     }
