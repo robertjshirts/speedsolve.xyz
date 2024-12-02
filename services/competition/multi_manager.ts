@@ -25,7 +25,7 @@ export class MultiManager {
   }
 
   addConnection(username: string, ws: WebSocket) {
-    this.activeSessions.delete(username);
+    this.activeSessions.set(username, {} as any);
     this.connections.set(username, ws);
     ws.onmessage = (event) => this.handleMessage(username, event);
     ws.onclose = () => {
@@ -56,7 +56,7 @@ export class MultiManager {
     logger.info("User disconnected", { username, sessionId: session.id });
     this.queues.removeFromQueue(username, session.cube_type);
     this.updatePeer(username, 'disconnected');
-    this.activeSessions.delete(username);
+    this.activeSessions.set(username, {} as any);
   }
 
   getActiveSessions() {
@@ -140,13 +140,14 @@ export class MultiManager {
   }
 
   private startQueue(username: string, cube_type: CubeType) {
+    const { scramble: oldScramble } = this.activeSessions.get(username) || {};
     const session: MultiSession = {
       id: username,
       cube_type,
       participants: new Set(),
       readyParticipants: new Set(),
       state: "queuing",
-      scramble: "",
+      scramble: oldScramble || "",
       results: {},
       start_time: null,
       timeoutId: null,
@@ -382,7 +383,7 @@ export class MultiManager {
     const session = this.activeSessions.get(username);
     if (!session) return;
     this.queues.removeFromQueue(username, session.cube_type);
-    this.activeSessions.delete(username);
+    this.activeSessions.set(username, {} as any);
 
     logger.info("Session ended", { 
       username, 
