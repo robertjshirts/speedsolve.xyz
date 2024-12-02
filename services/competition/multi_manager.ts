@@ -415,7 +415,7 @@ export class MultiManager {
           username: username,
           time: result.time,
           penalty: result.penalty,
-          scramble: session.scramble,
+          scramble: session.scramble!,
           cube: session.cube_type,
         });
 
