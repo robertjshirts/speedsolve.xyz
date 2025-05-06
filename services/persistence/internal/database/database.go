@@ -16,22 +16,29 @@ type SpeedDB struct {
 
 func NewSpeedDB(ctx context.Context, cfg config.Config) (*SpeedDB, error) {
 	log.Debug().Str("dsn", cfg.DatabaseDSN).Msg("Connecting to database")
-	db, err := sqlx.ConnectContext(ctx, "postgres", cfg.DatabaseDSN)
-	if err != nil {
-		return nil, err
-	}
+	var db *sqlx.DB
+	var err error
 
 	// Repeat ping every 5 seconds until we can connect to the database
 	log.Debug().Msg("Pinging database...")
 	for {
-		if err := db.PingContext(ctx); err != nil {
-			log.Error().Err(err).Msg("Failed to ping database, retrying in 5 seconds...")
+		if db, err = sqlx.ConnectContext(ctx, "postgres", cfg.DatabaseDSN); err != nil {
+			log.Warn().Err(err).Msg("Failed to connect to database, retrying in 5 seconds...")
 			log.Debug().Msgf("Sleeping for %v seconds", cfg.DatabaseRetryInterval)
 			time.Sleep(cfg.DatabaseRetryInterval)
 		} else {
+			log.Debug().Msg("Initial connection to database established")
 			break
 		}
 	}
+
+	// Sanity check ping 
+	if err = db.PingContext(ctx); err != nil {
+		log.Error().Err(err).Msg("Failed to ping database after initial connection")
+		return nil, err
+	}
+
+	log.Debug().Msg("Database connection established")
 
 	return &SpeedDB{
 		DB: db,

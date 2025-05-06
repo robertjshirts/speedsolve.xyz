@@ -28,5 +28,6 @@ func main() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("Failed to connect to database")
 	}
+	log.Info().Msg("Database connection established.")
 
 }

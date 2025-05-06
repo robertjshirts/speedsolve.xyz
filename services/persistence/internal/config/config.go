@@ -25,14 +25,14 @@ func initializeLogger() error {
 
 	if logEnv == "dev" {
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-		zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
-		logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "15:04:05.000"}).With().Timestamp().Logger()
+		zerolog.TimeFieldFormat = time.RFC3339
+		logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "2006-01-02 15:04:05.000"}).With().Timestamp().Logger()
 		zerolog.DefaultContextLogger = &logger
 		log.Info().Msg("Development logger initialized")
 	} else if logEnv == "prod" {
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-		zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
-		logger := zerolog.New(os.Stderr).With().Timestamp().Logger()
+		zerolog.TimeFieldFormat = time.RFC3339
+		logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr, TimeFormat: "2006-01-02 15:04:05.000"}).With().Timestamp().Logger()
 		zerolog.DefaultContextLogger = &logger
 		log.Info().Msg("Production logger initialized")
 	}
@@ -52,14 +52,14 @@ func LoadConfig() (*Config, error) {
 	log.Debug().Msg("Database DSN loaded")
 
 	retryIntervalInt, err := strconv.Atoi(os.Getenv("SPEED_DB_RETRY_INTERVAL"))
-	if retryIntervalInt == 0 || err != nil {
-		log.Warn().Msg("SPEED_DB_RETRY_INTERVAL not set, defaulting to 5000 ms")
-		retryIntervalInt = 5000
+	if retryIntervalInt == 0 || retryIntervalInt > 30 || err != nil {
+		log.Warn().Msg("SPEED_DB_RETRY_INTERVAL not set, defaulting to 5s")
+		retryIntervalInt = 5
 	}
 	log.Debug().Msg("SPEED_DB_RETRY_INTERVAL loaded")
 
 	return &Config{
 		DatabaseDSN:           dsn,
-		DatabaseRetryInterval: time.Duration(retryIntervalInt),
+		DatabaseRetryInterval: time.Duration(retryIntervalInt) * time.Second,
 	}, nil
 }

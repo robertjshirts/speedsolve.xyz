@@ -18,6 +18,8 @@ services:
     build: ./services/persistence
     environment:
       SPEED_DB_DSN: ${SPEED_DB_DSN}
+    networks:
+      - speednet
 
 volumes:
   speed_db:
