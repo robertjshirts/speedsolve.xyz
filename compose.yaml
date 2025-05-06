@@ -4,6 +4,7 @@ services:
   speed_db:
     image: postgres:17
     container_name: speed_db
+    ports: [5432:5432]
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -13,11 +14,18 @@ services:
       - speed_db:/var/lib/postgresql/data
     networks:
       - speednet
+  speed_cache:
+    image: redis:8
+    container_name: speed_cache
+    restart: unless-stopped
+    networks:
+      - speednet
   speed_persistence:
     container_name: speed_persistence
     build: ./services/persistence
     environment:
       SPEED_DB_DSN: ${SPEED_DB_DSN}
+      SPEED_CACHE_DSN: ${SPEED_CACHE_DSN}
     networks:
       - speednet
 
