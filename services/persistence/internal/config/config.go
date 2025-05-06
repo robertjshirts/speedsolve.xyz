@@ -13,12 +13,15 @@ import (
 )
 
 type Config struct {
-	DatabaseDSN           string
-	DatabaseRetryInterval time.Duration
+	DatabaseDSN             string
+	CacheDSN                string
+	StartupTimeout          time.Duration
+	ConnectionRetryInterval time.Duration
+	ConnectionPingTimeout   time.Duration
 }
 
 func initializeLogger() error {
-	logEnv := strings.ToLower(os.Getenv("LOG_ENV"))
+	logEnv := strings.ToLower(os.Getenv("SPEED_PERSISTENCE_LOG_ENV"))
 	if logEnv == "" {
 		logEnv = "dev"
 	}
@@ -44,6 +47,26 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
+	startupTimeoutInt, err := strconv.Atoi(os.Getenv("SPEED_PERSISTENCE_STARTUP_TIMEOUT"))
+	if startupTimeoutInt == 0 || startupTimeoutInt > 180 || err != nil {
+		log.Warn().Msg("SPEED_PERSISTENCE_STARTUP_TIMEOUT not set, defaulting to 60s")
+		startupTimeoutInt = 60
+	}
+
+	retryIntervalInt, err := strconv.Atoi(os.Getenv("SPEED_PERSISTENCE_CONN_RETRY_INTERVAL"))
+	if retryIntervalInt == 0 || retryIntervalInt > 30 || err != nil {
+		retryIntervalInt = 5
+		log.Warn().Msg("SPEED_PERSISTENCE_CONN_RETRY_INTERVAL not set, defaulting to 5s")
+	}
+	log.Debug().Msg("SPEED_PERSISTENCE_CONN_RETRY_INTERVAL loaded")
+
+	pingTimeoutInt, err := strconv.Atoi(os.Getenv("SPEED_PERSISTENCE_CONN_PING_TIMEOUT"))
+	if pingTimeoutInt == 0 || pingTimeoutInt > 10 || err != nil {
+		log.Warn().Msg("SPEED_PERSISTENCE_CONN_PING_TIMEOUT not set, defaulting to 2s")
+		pingTimeoutInt = 2
+	}
+	log.Debug().Msg("SPEED_PERSISTENCE_CONN_PING_TIMEOUT loaded")
+
 	dsn := os.Getenv("SPEED_DB_DSN")
 	if dsn == "" {
 		log.Error().Msg("SPEED_DB_DSN not set in .env or as an environment variable")
@@ -51,15 +74,18 @@ func LoadConfig() (*Config, error) {
 	}
 	log.Debug().Msg("Database DSN loaded")
 
-	retryIntervalInt, err := strconv.Atoi(os.Getenv("SPEED_DB_RETRY_INTERVAL"))
-	if retryIntervalInt == 0 || retryIntervalInt > 30 || err != nil {
-		log.Warn().Msg("SPEED_DB_RETRY_INTERVAL not set, defaulting to 5s")
-		retryIntervalInt = 5
+	cacheDSN := os.Getenv("SPEED_CACHE_DSN")
+	if cacheDSN == "" {
+		log.Error().Msg("SPEED_CACHE_DSN not set in .env or as an environment variable")
+		return nil, fmt.Errorf("SPEED_CACHE_DSN not set")
 	}
-	log.Debug().Msg("SPEED_DB_RETRY_INTERVAL loaded")
+	log.Debug().Msg("Cache DSN loaded")
 
 	return &Config{
-		DatabaseDSN:           dsn,
-		DatabaseRetryInterval: time.Duration(retryIntervalInt) * time.Second,
+		DatabaseDSN:             dsn,
+		CacheDSN:                cacheDSN,
+		StartupTimeout:          time.Duration(startupTimeoutInt) * time.Second,
+		ConnectionRetryInterval: time.Duration(retryIntervalInt) * time.Second,
+		ConnectionPingTimeout:   time.Duration(pingTimeoutInt) * time.Second,
 	}, nil
 }

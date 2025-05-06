@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/jmoiron/sqlx"
@@ -16,33 +17,38 @@ type SpeedDB struct {
 
 func NewSpeedDB(ctx context.Context, cfg config.Config) (*SpeedDB, error) {
 	log.Debug().Str("dsn", cfg.DatabaseDSN).Msg("Connecting to database")
-	var db *sqlx.DB
-	var err error
 
-	// Repeat ping every 5 seconds until we can connect to the database
-	log.Debug().Msg("Pinging database...")
+	// Set up timeout between connection attempts
+	ticker := time.NewTicker(cfg.ConnectionRetryInterval)
+	defer ticker.Stop()
+
+	log.Debug().Msgf("Retry interval set to %d seconds", int(cfg.ConnectionRetryInterval.Seconds()))
+	log.Debug().Msgf("Ping timeout set to %d seconds", int(cfg.ConnectionPingTimeout.Seconds()))
+
 	for {
-		if db, err = sqlx.ConnectContext(ctx, "postgres", cfg.DatabaseDSN); err != nil {
-			log.Warn().Err(err).Msg("Failed to connect to database, retrying in 5 seconds...")
-			log.Debug().Msgf("Sleeping for %v seconds", cfg.DatabaseRetryInterval)
-			time.Sleep(cfg.DatabaseRetryInterval)
-		} else {
-			log.Debug().Msg("Initial connection to database established")
-			break
+		// Set up timeout for the actual connection attempt
+		pingCtx, cancelPing := context.WithTimeout(ctx, cfg.ConnectionPingTimeout)
+		db, err := sqlx.ConnectContext(pingCtx, "postgres", cfg.DatabaseDSN)
+		cancelPing()
+
+		if err == nil {
+			log.Debug().Msg("Database connection established")
+			return &SpeedDB{
+				DB: db,
+			}, nil
+		}
+
+		deadline, _ := ctx.Deadline()
+		log.Warn().Err(err).Msgf("Failed to connect to database, %ds remaining", int(time.Until(deadline).Seconds()))
+
+		select {
+		case <-ticker.C:
+			log.Debug().Msg("Retrying database connection...")
+			continue
+		case <-ctx.Done():
+			return nil, fmt.Errorf("database connection interrupted: %v", ctx.Err())
 		}
 	}
-
-	// Sanity check ping 
-	if err = db.PingContext(ctx); err != nil {
-		log.Error().Err(err).Msg("Failed to ping database after initial connection")
-		return nil, err
-	}
-
-	log.Debug().Msg("Database connection established")
-
-	return &SpeedDB{
-		DB: db,
-	}, nil
 }
 
 func (db *SpeedDB) Close() error {
